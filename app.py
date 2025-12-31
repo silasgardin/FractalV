@@ -14,7 +14,7 @@ SHEETS = {
         "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing", 
         "preco": 3.50
     },
-    "Mega Sena": {
+    "Mega_Sena": {
         "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
         "preco": 6.00
     },
