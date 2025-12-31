@@ -1,21 +1,22 @@
 # ==============================================================================
-# 🧠 ORÁCULO MOTOR V34 - AI POWERED ARCHITECT
-# (Financial Intelligence + Fractal Logic + Expert Filters + Generative AI)
+# 🧠 ORÁCULO MOTOR V35 - GEMINI EDITION
+# (Financial Intelligence + Fractal Logic + Google Gemini AI)
 # ==============================================================================
 
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 import random
+import google.generativeai as genai
 import warnings
 
 warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V34 (AI Powered Architect)"
+        self.versao = "V35 (Gemini Edition)"
         
-        # Configurações de Jogo (Universo e Marcação Padrão)
+        # Configurações de Jogo
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca_base": 15},
             "Mega_Sena":      {"total": 60, "marca_base": 6},
@@ -27,7 +28,7 @@ class OraculoCerebro:
             "Mega_da_Virada": {"total": 60, "marca_base": 6}
         }
         
-        # Tabela de Preços para Apostas Múltiplas (Estimativa Base)
+        # Multiplicadores para Apostas Múltiplas
         self.multiplicadores = {
             "Mega_Sena":      {6: 1, 7: 7, 8: 28, 9: 84, 10: 210},
             "Mega_da_Virada": {6: 1, 7: 7, 8: 28, 9: 84},
@@ -40,14 +41,10 @@ class OraculoCerebro:
         }
 
     def carregar_csv(self, url):
-        """Lê CSV diretamente da URL pública do Google Sheets"""
-        try:
-            df = pd.read_csv(url)
-            return df
+        try: return pd.read_csv(url)
         except: return None
 
     def _tratar_preco(self, valor_str):
-        """Converte 'R$ 6,00' para float 6.00"""
         try:
             if isinstance(valor_str, (int, float)): return float(valor_str)
             clean = str(valor_str).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
@@ -55,16 +52,14 @@ class OraculoCerebro:
         except: return 0.0
 
     def atualizar_precos(self, url_precos, loteria_chave):
-        """Busca o preço base na planilha e gera a tabela de combos"""
         df = self.carregar_csv(url_precos)
         preco_base = 0.0
-        fallback = 3.00
+        fallback = 3.00 # Preço de segurança
         
         if df is not None:
             for _, row in df.iterrows():
                 nome_csv = str(row[0]).lower().replace('á','a').replace('ã','a').replace(' ','_')
-                chave_busca = loteria_chave.lower()
-                if chave_busca in nome_csv or nome_csv in chave_busca:
+                if loteria_chave.lower() in nome_csv or nome_csv in loteria_chave.lower():
                     preco_base = self._tratar_preco(row[1])
                     break
         
@@ -75,16 +70,14 @@ class OraculoCerebro:
             if k.lower() in loteria_chave.lower(): chave_mult = k; break
             
         if chave_mult:
-            mults = self.multiplicadores[chave_mult]
-            tabela_atualizada = {qtd: (fator * preco_base) for qtd, fator in mults.items()}
+            tabela = {qtd: (fat * preco_base) for qtd, fat in self.multiplicadores[chave_mult].items()}
         else:
             base = self.config_base.get(loteria_chave, {}).get('marca_base', 6)
-            tabela_atualizada = {base: preco_base}
+            tabela = {base: preco_base}
             
-        return tabela_atualizada, preco_base
+        return tabela, preco_base
 
     # --- CAMADA 1: MOTORES MATEMÁTICOS ---
-    
     def _core_markov(self, hist, total):
         matriz = np.zeros((total + 1, total + 1)); recorte = hist[-100:]
         for i in range(len(recorte)-1):
@@ -111,4 +104,167 @@ class OraculoCerebro:
             for d in range(1, total+1):
                 saiu = 1 if d in p else 0; atr = atrasos[d]
                 if d in c or atr > 5: X.append([d, saiu, atr]); y.append(1 if d in c else 0)
-                atrasos[d] = 0 if d in p else atras
+                atrasos[d] = 0 if d in p else atrasos[d]+1
+        scores = {}
+        try:
+            model = GradientBoostingClassifier(n_estimators=40, max_depth=3)
+            model.fit(np.array(X), np.array(y))
+            last = hist[-1]
+            for d in range(1, total+1):
+                saiu = 1 if d in last else 0
+                scores[d] = model.predict_proba(np.array([[d, saiu, atrasos[d]]]))[0][1]
+        except: scores = {d: 0.5 for d in range(1, total+1)}
+        return scores
+
+    def _core_fractal(self, hist, total):
+        scores = {}; recorte = hist[-50:]
+        for d in range(1, total+1):
+            series = [1 if d in row else 0 for row in recorte]
+            if len(series) < 5: scores[d] = 0.5; continue
+            flips = sum(1 for i in range(1, len(series)) if series[i] != series[i-1])
+            ratio = flips / (len(series) - 1)
+            scores[d] = ratio if series[-1] == 0 else 1.0 - ratio
+        return scores
+
+    # --- CAMADA 2: FILTROS ---
+    def _validar_filtros(self, jogo, last_draw, loteria_chave):
+        soma = sum(jogo)
+        if "facil" in loteria_chave.lower():
+            media = len(jogo) * 13 
+            if not (media - 35 <= soma <= media + 35): return False
+            comuns = len(set(jogo).intersection(set(last_draw)))
+            delta = len(jogo) - 15
+            if not (8 + delta <= comuns <= 11 + delta): return False
+        elif "mega" in loteria_chave.lower():
+            if len(jogo) == 6 and not (140 <= soma <= 240): return False
+        return True
+
+    # --- CAMADA 3: FINANCEIRO ---
+    def otimizar_orcamento(self, tabela_precos, orcamento):
+        base_dezenas = min(tabela_precos.keys())
+        melhor = base_dezenas
+        qtd_final = int(orcamento // tabela_precos[base_dezenas])
+        
+        for dezenas in sorted(tabela_precos.keys(), reverse=True):
+            preco = tabela_precos[dezenas]
+            qtd_possivel = int(orcamento // preco)
+            if qtd_possivel >= 1:
+                min_jogos = 2 if dezenas > base_dezenas else 1
+                if qtd_possivel >= min_jogos:
+                    melhor = dezenas; qtd_final = qtd_possivel; break
+        
+        custo = tabela_precos[melhor]
+        return {"tipo": "Combo" if melhor > base_dezenas else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
+
+    # --- CAMADA 4: I.A. GEMINI (NOVO) ---
+    def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
+        """Conecta ao Google Gemini para análise qualitativa"""
+        try:
+            # Configura o Gemini
+            genai.configure(api_key=api_key)
+            
+            # Modelo Flash é mais rápido e ideal para análise de dados
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            jogos_texto = "\n".join([f"- Jogo: {j[0]} (Score Mat: {j[1]:.2f})" for j in jogos_top3])
+            
+            prompt = f"""
+            Aja como um Matemático Especialista em Probabilidades de Loteria.
+            Analise os dados gerados pelo meu algoritmo para a {loteria}:
+            
+            1. Estratégia Financeira Aplicada: {estrategia_fin['estrategia']}
+            2. Jogos Gerados (Top 3 de {estrategia_fin['qtd']} gerados):
+            {jogos_texto}
+            
+            Tarefa:
+            - Explique de forma simples por que a estratégia de jogar com {estrategia_fin['estrategia']} é matematicamente vantajosa para este orçamento.
+            - Olhe para os números do Jogo 1 e cite uma curiosidade estatística (ex: equilibrio par/impar, soma ou sequências).
+            - Dê uma frase motivacional curta sobre probabilidades.
+            
+            Responda em Português.
+            """
+            
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            return f"⚠️ Gemini indisponível no momento: {str(e)}. (Mas os jogos calculados estão corretos!)"
+
+    # --- EXECUÇÃO CLOUD ---
+    def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
+        # Config e Leitura
+        cfg = self.config_base.get(loteria_chave)
+        if not cfg:
+             for k, v in self.config_base.items():
+                if loteria_chave.lower() in k.lower(): cfg = v; loteria_chave = k; break
+        
+        df = self.carregar_csv(url_dados)
+        if df is None: return {"erro": "Erro leitura dados."}
+        
+        cols = [c for c in df.columns if c.strip().upper().startswith('D')]
+        for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
+        if 'Concurso' in df.columns: df = df.dropna(subset=['Concurso']).sort_values('Concurso')
+
+        # Preços e Orçamento
+        tabela_precos, preco_base = self.atualizar_precos(url_precos, loteria_chave)
+        plano = self.otimizar_orcamento(tabela_precos, orcamento)
+        
+        if plano['qtd'] < 1: return {"erro": "Orçamento insuficiente."}
+
+        # Motores Matemáticos
+        hist = df[cols].values
+        s_mk = self._core_markov(hist, cfg['total'])
+        s_ia = self._core_xgboost(hist, cfg['total'])
+        s_fr = self._core_fractal(hist, cfg['total'])
+        
+        w_mk, w_ia, w_fr = 0.3, 0.5, 0.2
+        if "facil" in loteria_chave.lower(): w_mk = 0.4
+        
+        def z(d):
+            v = list(d.values()); m, s = np.mean(v), np.std(v)
+            return {k: (val-m)/s if s>0 else 0 for k,val in d.items()}
+        
+        z_mk, z_ia, z_fr = z(s_mk), z(s_ia), z(s_fr)
+        final = {d: (z_mk[d]*w_mk + z_ia[d]*w_ia + z_fr[d]*w_fr) for d in range(1, cfg['total']+1)}
+        
+        ranking = sorted(final.items(), key=lambda x: x[1], reverse=True)
+        pool_elite = [x[0] for x in ranking[:int(cfg['total']*0.7)]]
+        
+        # Zebra: do fim da lista, evitando os 5 piores
+        pool_zebra = [x[0] for x in ranking[int(cfg['total']*0.7):-5]]
+        if not pool_zebra: pool_zebra = [x[0] for x in ranking[int(cfg['total']*0.7):]]
+
+        jogos = []
+        marca = plano['dezenas']
+        
+        num_zebras = 2
+        if marca >= 8: num_zebras = 3
+        if "facil" in loteria_chave.lower() and marca >= 16: num_zebras = 4
+        num_elite = marca - num_zebras
+
+        tentativas = 0
+        while len(jogos) < plano['qtd'] and tentativas < 10000:
+            tentativas += 1
+            try:
+                base = random.sample(pool_elite, num_elite) + random.sample(pool_zebra, num_zebras)
+                jg = sorted(list(set(base)))
+                while len(jg) < marca: jg.append(random.choice(pool_elite)); jg = sorted(list(set(jg)))
+                jg = jg[:marca]
+                
+                if self._validar_filtros(jg, hist[-1], loteria_chave):
+                    if jg not in [x[0] for x in jogos]:
+                        f = sum([final[n] for n in jg])
+                        jogos.append((jg, f))
+            except: continue
+        
+        jogos.sort(key=lambda x: x[1], reverse=True)
+        
+        return {
+            "financeiro": {
+                "estrategia": f"{plano['tipo']} ({marca} dz)",
+                "qtd": plano['qtd'],
+                "troco": plano['troco'],
+                "preco_base": preco_base,
+                "conselho": f"V35 Otimizado: {plano['qtd']} jogos de {marca} dezenas."
+            },
+            "jogos": jogos
+        }
