@@ -40,7 +40,7 @@ SHEETS = {
     "Loto Mania": {
         "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=848764653&single=true&output=csv",
         "preco": 3.00
-    }
+    },
 }
 
 # --- BARRA LATERAL ---
