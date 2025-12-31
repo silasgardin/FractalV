@@ -30,37 +30,37 @@ SHEETS = {
         "desc": "Aposte na Inércia (Repetição)"
     },
     "Mega Sena": {
-        "url": "COLE_O_LINK_CSV_DA_MEGA_SENA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=936546416&single=true&output=csv",
         "preco": 6.00,
         "desc": "Aposte na Entropia (Caos)"
     },
     "Quina": {
-        "url": "COLE_O_LINK_CSV_DA_QUINA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1703483549&single=true&output=csv",
         "preco": 3.00,
         "desc": "Equilíbrio Markoviano"
     },
     "Dia de Sorte": {
-        "url": "COLE_O_LINK_CSV_DO_DIA_DE_SORTE_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1059501941&single=true&output=csv",
         "preco": 2.50,
         "desc": "Distribuição Normal (Gauss)"
     },
     "Timemania": {
-        "url": "COLE_O_LINK_CSV_DA_TIMEMANIA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1575649264&single=true&output=csv",
         "preco": 3.50,
         "desc": "Foco em Colunas"
     },
     "Dupla Sena": {
-        "url": "COLE_O_LINK_CSV_DA_DUPLA_SENA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=152509825&single=true&output=csv",
         "preco": 3.00,
         "desc": "Dupla Chance Fractal"
     },
     "Lotomania": {
-        "url": "COLE_O_LINK_CSV_DA_LOTOMANIA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=848764653&single=true&output=csv",
         "preco": 3.00,
         "desc": "Espelhamento de Quadrantes"
     },
     "Mega da Virada": {
-        "url": "COLE_O_LINK_CSV_DA_MEGA_VIRADA_AQUI", # Pode usar o mesmo da Mega Sena se quiser
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=298407214&single=true&output=csv", # Pode usar o mesmo da Mega Sena se quiser
         "preco": 6.00,
         "desc": "Especial de Fim de Ano"
     }
