@@ -14,7 +14,7 @@ st.markdown("### Inteligência Artificial Fractal para Loterias")
 
 SHEETS = {
     "Mega Sena": {
-        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing", 
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=936546416&single=true&output=csv", 
         "preco": 6.00
     },
     "Lotofácil": {
