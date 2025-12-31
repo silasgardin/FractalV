@@ -1,64 +1,81 @@
 import streamlit as st
 import oraculo_motor
 
-# Configuração da Página
-st.set_page_config(page_title="Oráculo V32", page_icon="🔮", layout="centered")
+st.set_page_config(page_title="Oráculo V32", page_icon="🔮")
 
-st.title("🔮 Oráculo V32 - Advisor Edition")
+st.title("🔮 Oráculo V32 Advisor")
 st.markdown("### Inteligência Artificial Fractal para Loterias")
 
-# --- 1. CONFIGURAÇÕES (Onde você cola os links do Google Sheets) ---
-# DICA: No Google Sheets, vá em Arquivo > Compartilhar > Publicar na Web > Escolha "CSV" e copie o link.
+# --- CONFIGURAÇÃO DAS PLANILHAS (COLE SEUS LINKS AQUI) ---
+# Passo a passo para pegar o link:
+# 1. No Google Sheets > Arquivo > Compartilhar > Publicar na Web
+# 2. Escolha a aba (ex: "Mega Sena") e o formato "Valores separados por vírgula (.csv)"
+# 3. Copie o link e cole abaixo.
+
 SHEETS = {
-    "Lotofácil": {
-        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing", 
-        "preco": 3.50
-    },
-    "Mega_Sena": {
-        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
+    "Mega Sena": {
+        "url": "COLE_O_LINK_CSV_DA_MEGA_AQUI", 
         "preco": 6.00
     },
+    "Lotofácil": {
+        "url": "COLE_O_LINK_CSV_DA_LOTOFACIL_AQUI",
+        "preco": 3.50
+    },
+    "Quina": {
+        "url": "COLE_O_LINK_CSV_DA_QUINA_AQUI",
+        "preco": 3.00
+    },
     "Dia de Sorte": {
-        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
+        "url": "COLE_O_LINK_CSV_DO_DIA_DE_SORTE_AQUI",
         "preco": 2.50
+    },
+    "Timemania": {
+        "url": "COLE_O_LINK_CSV_DA_TIMEMANIA_AQUI",
+        "preco": 3.50
     }
 }
 
-# --- 2. INTERFACE ---
-col1, col2 = st.columns(2)
-with col1:
-    loteria = st.selectbox("Escolha a Loteria:", list(SHEETS.keys()))
-with col2:
-    orcamento = st.number_input("O seu Orçamento (R$):", min_value=1.0, value=30.0, step=5.0)
+# --- BARRA LATERAL ---
+with st.sidebar:
+    st.header("Parâmetros")
+    loteria = st.selectbox("Escolha o Jogo:", list(SHEETS.keys()))
+    orcamento = st.number_input("Orçamento Disponível (R$):", min_value=1.0, value=50.0, step=10.0)
+    st.info(f"Preço da aposta: R$ {SHEETS[loteria]['preco']:.2f}")
 
+# --- BOTÃO PRINCIPAL ---
 if st.button("🔮 Consultar Oráculo", type="primary"):
-    with st.spinner(f"A processar algoritmos Fractais para {loteria}..."):
-        # Inicializa Cérebro
+    with st.spinner(f"A conectar ao Google Sheets e processar V32 Fractal para {loteria}..."):
+        
         cerebro = oraculo_motor.OraculoCerebro()
         dados = SHEETS[loteria]
         
-        # Executa
-        # Se você ainda não pôs o link real, vai dar erro.
-        if "LINK_DA_SUA" in dados['url']:
-            st.error("⚠️ Você precisa configurar os links do Google Sheets no arquivo app.py!")
+        # Verifica se o link foi configurado
+        if "COLE_O_LINK" in dados['url']:
+            st.error("⚠️ ERRO: Você precisa editar o arquivo app.py e colocar os links do Google Sheets!")
         else:
+            # Executa o Motor
             resultado = cerebro.gerar_palpite_cloud(
                 url_dados=dados['url'],
-                loteria_chave=loteria.replace("ó","o").replace(" ","_"), # Normaliza nome
-                preco=dados['preco'],
+                loteria_chave=loteria.replace(" ","_").replace("á","a"),
+                preco_aposta=dados['preco'],
                 orcamento=orcamento
             )
             
             if "erro" in resultado:
-                st.error(f"Erro: {resultado['erro']}")
+                st.error(resultado['erro'])
             else:
-                # Exibe Consultoria
                 fin = resultado['financeiro']
-                st.success(f"**Estratégia:** {fin['nome']}")
-                st.info(f"💡 {fin['conselho']} | Jogos: {fin['qtd']} (Troco: R$ {fin['troco']:.2f})")
                 
-                # Exibe Jogos
+                # Exibe Estratégia
+                st.success(f"**Estratégia Recomendada:** {fin['estrategia']}")
+                col1, col2 = st.columns(2)
+                col1.metric("Jogos Possíveis", fin['qtd'])
+                col2.metric("Troco", f"R$ {fin['troco']:.2f}")
+                st.caption(fin['conselho'])
+                
+                # Exibe Tabela de Jogos
                 st.divider()
-                st.subheader("🎲 Jogos Gerados")
+                st.subheader("🎲 Palpites Gerados")
+                
                 for i, (jg, score) in enumerate(resultado['jogos']):
-                    st.text(f"Jogo {i+1:02d} | Força {score:.2f} | {jg}")
+                    st.text(f"Jogo {i+1:02d} | Força: {score:.2f} | {jg}")
