@@ -14,23 +14,23 @@ st.markdown("### Inteligência Artificial Fractal para Loterias")
 
 SHEETS = {
     "Mega Sena": {
-        "url": "COLE_O_LINK_CSV_DA_MEGA_AQUI", 
+        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing", 
         "preco": 6.00
     },
     "Lotofácil": {
-        "url": "COLE_O_LINK_CSV_DA_LOTOFACIL_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
         "preco": 3.50
     },
     "Quina": {
-        "url": "COLE_O_LINK_CSV_DA_QUINA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
         "preco": 3.00
     },
     "Dia de Sorte": {
-        "url": "COLE_O_LINK_CSV_DO_DIA_DE_SORTE_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
         "preco": 2.50
     },
     "Timemania": {
-        "url": "COLE_O_LINK_CSV_DA_TIMEMANIA_AQUI",
+        "url": "https://docs.google.com/spreadsheets/d/1Uawi-DjZiY5wVZyqntQYctboRPqvu1vBFoiL7h4GkMw/edit?usp=sharing",
         "preco": 3.50
     }
 }
