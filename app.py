@@ -29,7 +29,7 @@ try:
     LINK_TABELA_PRECOS = meus_links.LINK_PRECOS
     SHEETS_URLS = meus_links.URLS
     
-    # Recria o dicionário completo
+    # Recria o dicionário completo com as descrições
     SHEETS = {
         "Lotofácil":    {"url": SHEETS_URLS["Lotofácil"],    "desc": "Inércia (Padrão de Repetição)"},
         "Mega Sena":    {"url": SHEETS_URLS["Mega Sena"],    "desc": "Entropia (Caos e Atrasos)"},
@@ -55,7 +55,8 @@ with st.sidebar:
     # --- GESTÃO DE CHAVE DE API (VIA STREAMLIT SECRETS) ---
     gemini_key = None
     
-    # Verifica se a chave existe no cofre seguro (.streamlit/secrets.toml)
+    # Tenta pegar a chave do cofre seguro (.streamlit/secrets.toml)
+    # Se você configurou no Streamlit Cloud, ele vai pegar daqui automaticamente.
     if "GEMINI_KEY" in st.secrets:
         gemini_key = st.secrets["GEMINI_KEY"]
         st.success("🔐 Chave Gemini autenticada via Secrets!")
