@@ -42,7 +42,7 @@ SHEETS = {
         "preco": 3.00
     },
 
-
+}
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.header("Parâmetros")
