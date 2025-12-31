@@ -1,0 +1,1 @@
+# oraculo-v32-app
