@@ -1,27 +1,17 @@
-import streamlit as st
-import oraculo_motor
-import meus_links  # <--- IMPORTAMOS O SEU ARQUIVO DE LINKS AQUI
+# meus_links.py
+# Este arquivo guarda SÓ os links. Você não precisa mexer nele quando atualizar o código.
 
-# --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="Oráculo V35 Gemini", page_icon="✨", layout="wide")
+# Link da aba de Preços
+LINK_PRECOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1620341582&single=true&output=csv"
 
-# ... (resto do código visual) ...
-
-# ==============================================================================
-# CONFIGURAÇÃO DOS LINKS (AUTOMÁTICA)
-# ==============================================================================
-# Agora o código puxa do arquivo externo. Não precisa colar nada aqui!
-LINK_TABELA_PRECOS = meus_links.LINK_PRECOS
-
-SHEETS = {
-    "Lotofácil":    {"url": meus_links.URLS["Lotofácil"],    "desc": "Inércia (Repetição)"},
-    "Mega Sena":    {"url": meus_links.URLS["Mega Sena"],    "desc": "Entropia (Caos)"},
-    "Quina":        {"url": meus_links.URLS["Quina"],        "desc": "Equilíbrio Markov"},
-    "Dia de Sorte": {"url": meus_links.URLS["Dia de Sorte"], "desc": "Gaussiana"},
-    "Timemania":    {"url": meus_links.URLS["Timemania"],    "desc": "Colunas"},
-    "Dupla Sena":   {"url": meus_links.URLS["Dupla Sena"],   "desc": "Dupla Chance"},
-    "Lotomania":    {"url": meus_links.URLS["Lotomania"],    "desc": "Espelhamento"},
-    "Mega da Virada": {"url": meus_links.URLS["Mega da Virada"], "desc": "Sazonal"}
+# Links das Loterias
+URLS = {
+    "Lotofácil":    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1063211255&single=true&output=csv",
+    "Mega Sena":    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=936546416&single=true&output=csv",
+    "Quina":        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1703483549&single=true&output=csv",
+    "Dia de Sorte": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1059501941&single=true&output=csv",
+    "Timemania":    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1575649264&single=true&output=csv",
+    "Dupla Sena":   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=152509825&single=true&output=csv",
+    "Lotomania":    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=848764653&single=true&output=csv",
+    "Mega da Virada": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=298407214&single=true&output=csv"
 }
-
-# ... (O resto do código continua exatamente igual) ...
