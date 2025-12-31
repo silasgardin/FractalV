@@ -1,139 +1,73 @@
 import streamlit as st
 import oraculo_motor
 
-# --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(
-    page_title="Oráculo V33 Pro",
-    page_icon="🔮",
-    layout="wide"
-)
+st.set_page_config(page_title="Oráculo V34 AI", page_icon="🤖", layout="wide")
 
-# Cabeçalho
-st.title("🔮 Oráculo V33 - Sistema Financeiro Integrado")
-st.markdown("""
-<style>
-.big-font { font-size:18px !important; }
-.metric-card { background-color: #f0f2f6; padding: 15px; border-radius: 10px; }
-</style>
-""", unsafe_allow_html=True)
+st.title("🤖 Oráculo V34 - I.A. Generativa Integrada")
+st.markdown("### Matemática Fractal + Análise de GPT")
 
-st.markdown("### 🤖 Assistente de Lotaria com Precificação Dinâmica (Sheets)")
-
-# --- 1. CONFIGURAÇÃO DOS LINKS (EDITAR AQUI) ---
-
-# Link da aba "Vlr_jogo" (Onde estão os preços das apostas)
-LINK_TABELA_PRECOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1620341582&single=true&output=csv"
-
-# Links dos Históricos (Onde estão os resultados passados)
+# --- 1. CONFIGURAÇÃO DOS LINKS (Mantenha os seus links aqui) ---
+LINK_TABELA_PRECOS = "COLE_AQUI_O_LINK_CSV_DA_ABA_VLR_JOGO"
 SHEETS = {
-    "Lotofácil": {
-        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1063211255&single=true&output=csv", 
-        "desc": "Aposte na Inércia (Repetição)"
-    },
-    "Mega Sena": {
-        "url": "COLE_LINK_CSV_MEGA_SENA",
-        "desc": "Aposte na Entropia (Caos)"
-    },
-    "Quina": {
-        "url": "COLE_LINK_CSV_QUINA",
-        "desc": "Equilíbrio Markoviano"
-    },
-    "Dia de Sorte": {
-        "url": "COLE_LINK_CSV_DIA_DE_SORTE",
-        "desc": "Distribuição Normal (Gauss)"
-    },
-    "Timemania": {
-        "url": "COLE_LINK_CSV_TIMEMANIA",
-        "desc": "Foco em Colunas"
-    },
-    "Dupla Sena": {
-        "url": "COLE_LINK_CSV_DUPLA_SENA",
-        "desc": "Dupla Chance Fractal"
-    },
-    "Lotomania": {
-        "url": "COLE_LINK_CSV_LOTOMANIA",
-        "desc": "Espelhamento de Quadrantes"
-    },
-    "Mega da Virada": {
-        "url": "COLE_LINK_CSV_MEGA_VIRADA", 
-        "desc": "Especial de Fim de Ano"
-    }
+    "Lotofácil":    {"url": "COLE_LINK_CSV", "desc": "Inércia"},
+    "Mega Sena":    {"url": "COLE_LINK_CSV", "desc": "Entropia"},
+    # ... (seus outros links) ...
 }
 
-# --- 2. BARRA LATERAL (CONTROLES) ---
+# --- 2. SIDEBAR COM CHAVE DE API ---
 with st.sidebar:
-    st.header("Parâmetros")
+    st.header("Configuração")
     
-    loteria = st.selectbox("Escolha a Modalidade:", list(SHEETS.keys()))
+    # Campo para senha da OpenAI
+    openai_key = st.text_input("OpenAI API Key (Opcional):", type="password", help="Cole sua chave sk-... aqui para ativar a análise de texto inteligente.")
     
-    st.info(f"ℹ️ **Lógica V33:** {SHEETS[loteria]['desc']}")
-    
-    orcamento = st.number_input(
-        "💰 Seu Orçamento (R$):", 
-        min_value=1.0, 
-        value=50.0, 
-        step=5.0,
-        help="Quanto quer investir? O Oráculo verifica o preço atualizado na planilha e calcula a melhor estratégia."
-    )
+    st.divider()
+    loteria = st.selectbox("Loteria:", list(SHEETS.keys()))
+    orcamento = st.number_input("Orçamento (R$):", min_value=1.0, value=50.0, step=10.0)
 
-# --- 3. EXECUÇÃO DO ORÁCULO ---
-if st.button("🔮 Consultar Estratégia & Gerar Jogos", type="primary", use_container_width=True):
+# --- 3. EXECUÇÃO ---
+if st.button("🔮 Gerar Estratégia", type="primary"):
+    # (Validação de links omitida para brevidade, mas mantenha a sua)
     
-    # Validação Básica de Links
-    if "COLE_" in LINK_TABELA_PRECOS or "COLE_" in SHEETS[loteria]['url']:
-        st.error("🚨 **ERRO DE CONFIGURAÇÃO:**")
-        st.warning("Você precisa configurar os links CSV do Google Sheets no ficheiro `app.py` antes de usar.")
-        st.stop()
-
-    with st.spinner(f"📡 A buscar preços atualizados na Nuvem e processar V33 para {loteria}..."):
-        try:
-            # Instancia o Cérebro
-            cerebro = oraculo_motor.OraculoCerebro()
+    with st.spinner("Processando Matemática V33..."):
+        cerebro = oraculo_motor.OraculoCerebro()
+        
+        # 1. Gera a Matemática (V33)
+        resultado = cerebro.gerar_palpite_cloud(
+            url_dados=SHEETS[loteria]['url'],
+            url_precos=LINK_TABELA_PRECOS,
+            loteria_chave=loteria.replace("á","a").replace(" ","_"),
+            orcamento=orcamento
+        )
+        
+        if "erro" in resultado:
+            st.error(resultado['erro'])
+        else:
+            fin = resultado['financeiro']
+            jogos = resultado['jogos']
             
-            # Normaliza o nome da lotaria para a chave interna (ex: "Lotofácil" -> "Lotofacil")
-            chave_normalizada = loteria.replace("á","a").replace("ç","c").replace(" ","_")
+            # --- MOSTRA RESULTADO MATEMÁTICO ---
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Estratégia", fin['estrategia'])
+            col2.metric("Jogos", fin['qtd'])
+            col3.metric("Preço Base", f"R$ {fin.get('preco_base', 0):.2f}")
             
-            # Executa o Motor V33 com Precificação Dinâmica
-            resultado = cerebro.gerar_palpite_cloud(
-                url_dados=SHEETS[loteria]['url'],
-                url_precos=LINK_TABELA_PRECOS,
-                loteria_chave=chave_normalizada, 
-                orcamento=orcamento
-            )
+            st.info(f"💡 Math Advice: {fin['conselho']}")
             
-            # Tratamento de Erros
-            if "erro" in resultado:
-                st.error(f"❌ Erro do Oráculo: {resultado['erro']}")
-            
-            else:
-                # SUCESSO!
-                fin = resultado['financeiro']
-                jogos = resultado['jogos']
-                
-                # Feedback de Preço Encontrado
-                preco_base = fin.get('preco_base', 0)
-                if preco_base > 0:
-                    st.toast(f"Preço Base Atualizado Detectado: R$ {preco_base:.2f}", icon="💲")
-                
-                # Bloco 1: Consultoria Financeira
-                st.markdown("---")
-                colA, colB, colC = st.columns(3)
-                colA.metric("Estratégia Definida", fin['estrategia'])
-                colB.metric("Quantidade de Jogos", fin['qtd'])
-                colC.metric("Troco (Saldo)", f"R$ {fin['troco']:.2f}")
-                
-                st.success(f"💡 **Conselho V33:** {fin['conselho']}")
-                
-                # Bloco 2: Os Palpites
-                st.markdown(f"### 🎲 Palpites Gerados ({len(jogos)} jogos)")
-                
-                for i, (jg, score) in enumerate(jogos):
-                    # Formatação visual dos números
-                    numeros_fmt = "  -  ".join([f"**{n:02d}**" for n in jg])
+            # --- MÁGICA DA I.A. (V34) ---
+            if openai_key:
+                with st.spinner("🤖 A I.A. está analisando os jogos gerados..."):
+                    # Pega os 3 melhores jogos para a IA opinar
+                    top3 = jogos[:3]
+                    analise_ia = cerebro.analisar_com_gpt(openai_key, loteria, fin, top3)
                     
-                    with st.expander(f"🎫 Jogo {i+1:02d} (Score Fractal: {score:.2f})", expanded=(i<5)):
-                        st.markdown(f"## {numeros_fmt}")
-                        if i == 0: st.caption("🏆 *Melhor oportunidade matemática identificada*")
+                    st.markdown("### 🧠 Análise do Agente I.A.")
+                    st.success(analise_ia)
+            else:
+                st.warning("⚠️ Insira uma API Key na barra lateral para ver a análise qualitativa da I.A.")
 
-        except Exception as e:
-            st.error(f"Ocorreu um erro crítico na execução: {e}")
+            # --- LISTA DE JOGOS ---
+            st.divider()
+            st.subheader("🎲 Palpites Finais")
+            for i, (jg, score) in enumerate(jogos):
+                st.text(f"Jogo {i+1:02d} | Força {score:.2f} | {jg}")
