@@ -3,7 +3,7 @@ import oraculo_motor
 import meus_links 
 
 # --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="Oráculo V40 Pro", page_icon="🔮", layout="wide")
+st.set_page_config(page_title="V40 Pro", page_icon="🔮", layout="wide")
 
 st.markdown("""
 <style>
