@@ -4,27 +4,20 @@ import meus_links
 import google.generativeai as genai
 
 # --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="FractalV 3.4 Financial", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="FractalV System", page_icon="🧬", layout="wide")
 
-# --- CSS PREMIUM (BIG NEUMORPHIC) ---
+# --- CSS PREMIUM ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
 
-    /* Estilo do Cartão Principal */
     .game-card {
-        background-color: #ffffff;
-        padding: 30px;
-        border-radius: 20px;
-        border-left: 8px solid #6c5ce7;
-        border: 1px solid #f0f2f5;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-        transition: transform 0.3s ease;
+        background-color: #ffffff; padding: 30px; border-radius: 20px;
+        border-left: 8px solid #6c5ce7; border: 1px solid #f0f2f5;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.08); margin-bottom: 25px; transition: transform 0.3s ease;
     }
     .game-card:hover { transform: translateY(-3px); }
 
-    /* Cabeçalho do Cartão */
     .card-header { 
         display: flex; justify-content: space-between; align-items: center; 
         margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f5f5f5; 
@@ -39,12 +32,8 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(108, 92, 231, 0.4);
     }
 
-    /* Container das Bolas */
-    .ball-container { 
-        display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding: 10px;
-    }
+    .ball-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding: 10px; }
 
-    /* ESTILO DAS BOLAS (GRANDES) */
     .ball {
         width: 65px; height: 65px; border-radius: 50%; 
         display: flex; align-items: center; justify-content: center;
@@ -55,13 +44,11 @@ st.markdown("""
     }
     .ball:hover { transform: scale(1.1); box-shadow: 0px 15px 30px -5px rgba(0,0,0,0.3); z-index: 10; }
 
-    /* Cores */
     .bg-roxo { background: radial-gradient(circle at 30% 30%, #be93d6, #8e44ad); }
     .bg-verde { background: radial-gradient(circle at 30% 30%, #58d68d, #27ae60); }
     .bg-azul { background: radial-gradient(circle at 30% 30%, #6dd5fa, #2980b9); }
     .bg-gold { background: radial-gradient(circle at 30% 30%, #f9e79f, #f1c40f); color: #333 !important; text-shadow: none; }
 
-    /* Botão */
     .stButton>button {
         width: 100%; height: 60px; background: linear-gradient(90deg, #6c5ce7, #a29bfe); 
         color: white; font-size: 20px; font-weight: 800; border: none; border-radius: 15px;
@@ -69,7 +56,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CACHE (ESTABILIDADE) ---
+# --- CACHE ---
 @st.cache_data(ttl=1800, show_spinner=False)
 def calcular_fractal_estavel(loteria_nome, orcamento, link_precos, url_dados):
     cerebro = fractal_motor.FractalCerebro()
@@ -84,7 +71,7 @@ def calcular_fractal_estavel(loteria_nome, orcamento, link_precos, url_dados):
 c1, c2 = st.columns([1, 6])
 with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
 with c2: 
-    st.title("FractalV 3.4")
+    st.title("FractalV System")
     st.markdown("### Inteligência Determinística & Gestão de Banca")
 
 try:
@@ -144,16 +131,16 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 
                 st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta.get('ultimo_concurso', 'N/A')}.")
 
-                # --- 1. PAINEL FINANCEIRO (RESTAURADO!) ---
+                # PAINEL FINANCEIRO
                 st.markdown("### 📊 Gestão de Banca")
                 col_fin1, col_fin2, col_fin3 = st.columns(3)
                 col_fin1.metric("Jogos Calculados", f"{fin['qtd']} jogos")
                 col_fin2.metric("Custo Total", f"R$ {fin['custo_total']:.2f}")
-                col_fin3.metric("Seu Troco", f"R$ {fin['troco']:.2f}", delta="Saldo Restante")
+                col_fin3.metric("Seu Troco", f"R$ {fin['troco']:.2f}", delta="Saldo")
                 
                 st.divider()
 
-                # --- 2. PAINEL DE INTELIGÊNCIA ---
+                # INTELIGÊNCIA
                 st.markdown("### 🧠 Plasticidade Neural & Entropia")
                 cols = st.columns(3)
                 pesos = meta['pesos_atuais']
@@ -162,7 +149,6 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 cols[2].metric("Gauss (Normal)", f"{pesos['Gauss']*100:.0f}%")
                 st.progress(max(pesos.values()))
 
-                # IA
                 if gemini_key:
                     with st.chat_message("assistant", avatar="🧬"):
                         st.markdown(f"**Análise ({modelo_selecionado}):**")
@@ -175,16 +161,14 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 st.subheader(f"Sequências Otimizadas ({len(jogos)})")
                 
                 css_class = SHEETS[loteria].get("css", "bg-azul")
-                # Desempacota (jogos, score, entropia)
                 for i, (jg, score, entropia) in enumerate(jogos):
                     bolas_html = ""
                     for num in jg:
                         bolas_html += f'<div class="ball {css_class}">{int(num):02d}</div>'
                     
-                    # Cor da Entropia
                     cor_entr = "#e74c3c"
-                    if 0.4 <= entropia <= 0.8: cor_entr = "#2ecc71" # Verde (Ideal)
-                    elif entropia > 0.8: cor_entr = "#f1c40f" # Amarelo (Caótico)
+                    if 0.4 <= entropia <= 0.8: cor_entr = "#2ecc71"
+                    elif entropia > 0.8: cor_entr = "#f1c40f"
 
                     st.markdown(f"""
                     <div class="game-card">
