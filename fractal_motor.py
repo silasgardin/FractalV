@@ -1,26 +1,25 @@
 # ==============================================================================
-# 🧠 FRACTAL-V MOTOR (V44) - CORE INTELLIGENCE
+# 🧠 FRACTAL MOTOR V45 - INTEGRADO COM LEARNER
 # ==============================================================================
 import pandas as pd
 import numpy as np
 import random
 import google.generativeai as genai
 import warnings
+import fractal_learner # <--- AQUI ESTÁ A NOVIDADE
 
 warnings.filterwarnings("ignore")
 
-class FractalCerebro: # Renomeado de OraculoCerebro
+class FractalCerebro:
     def __init__(self):
-        self.versao = "FractalV 1.0 (Genesis)"
+        self.versao = "FractalV 2.0 (Self-Learning)"
+        self.learner = fractal_learner.FractalLearner() # Conecta ao Cérebro Vivo
+        
         self.config_base = {
             "Lotofacil": {"total": 25, "marca_base": 15}, "Mega_Sena": {"total": 60, "marca_base": 6},
             "Quina": {"total": 80, "marca_base": 5}, "Dia_de_Sorte": {"total": 31, "marca_base": 7},
             "Timemania": {"total": 80, "marca_base": 10}, "Dupla_Sena": {"total": 50, "marca_base": 6},
             "Lotomania": {"total": 100,"marca_base": 50}, "Mega_da_Virada": {"total": 60, "marca_base": 6}
-        }
-        self.tabela_precos_default = {
-            "Mega_Sena": 6.00, "Mega_da_Virada": 6.00, "Lotofacil": 3.50,
-            "Quina": 3.00, "Dia_de_Sorte": 2.50, "Timemania": 3.50, "Lotomania": 3.00, "Dupla_Sena": 3.00
         }
 
     def carregar_csv(self, url):
@@ -49,18 +48,34 @@ class FractalCerebro: # Renomeado de OraculoCerebro
         return {"qtd": max(1, qtd_jogos), "preco_unit": preco_unitario, "troco": orcamento_usuario - (qtd_jogos * preco_unitario), "custo_total": qtd_jogos * preco_unitario}
 
     def executar_backtest(self, hist, total_dezenas):
-        if len(hist) < 5: return "Padrão Fractal (Dados Insuficientes)", {}
-        
-        scores = {"Markov (Inércia)": 0, "Fractal (Equilíbrio)": 0}
+        if len(hist) < 5: return "Padrão Fractal", {}
+        scores = {"Markov": 0, "Fractal": 0, "Gauss": 0}
         try:
             teste = hist[-5:]
             for i in range(len(teste)-1):
                 passado = set([int(x) for x in teste[i] if pd.notna(x)])
                 futuro = set([int(x) for x in teste[i+1] if pd.notna(x)])
-                scores["Markov (Inércia)"] += len(passado.intersection(futuro))
+                
+                # Backtest Simplificado
+                # Markov: Repetição
+                mk = len(passado.intersection(futuro))
+                scores["Markov"] += mk
+                
+                # Fractal: Ausentes
+                ausentes = set(range(1, total_dezenas+1)) - passado
+                fr = len(ausentes.intersection(futuro))
+                scores["Fractal"] += fr
+                
         except: pass
         
-        return max(scores, key=scores.get), scores
+        vencedora = max(scores, key=scores.get)
+        
+        # --- MOMENTO DE APRENDIZADO ---
+        # O sistema avisa o Learner quem ganhou para ele ajustar os pesos
+        aprendeu, quem = self.learner.regenerar_pesos(vencedora)
+        # ------------------------------
+        
+        return vencedora, scores, aprendeu
 
     def analisar_com_gemini(self, api_key, loteria, dados_fin, jogos_top3, backtest_info):
         try:
@@ -76,9 +91,12 @@ class FractalCerebro: # Renomeado de OraculoCerebro
 
             model = genai.GenerativeModel(modelo)
             vencedora = backtest_info.get('vencedora', 'Padrão')
-            jogos_txt = "\n".join([f"- {j[0]}" for j in jogos_top3])
             
-            prompt = f"Analise estes palpites do sistema FractalV para a {loteria}.\nEstratégia: {vencedora}\nJogos:\n{jogos_txt}\n\nResponda em Português (curto):\n1. Por que a lógica '{vencedora}' se aplica aqui?\n2. Analise a distribuição do primeiro jogo."
+            # Pega o estado mental da IA
+            pesos = self.learner.get_pesos()
+            status_ia = f"Markov: {pesos['Markov']:.2f} | Fractal: {pesos['Fractal']:.2f}"
+            
+            prompt = f"Analise estes palpites FractalV para {loteria}.\nEstratégia Atual: {vencedora}\nEstado da Rede Neural: {status_ia}\nJogos: {jogos_top3[0][0]}\n\nResponda:\n1. Como a estratégia '{vencedora}' influenciou este jogo?\n2. O sistema está confiando mais em Markov ou Fractal hoje?"
             response = model.generate_content(prompt)
             return response.text
         except Exception as e: return f"⚠️ IA Off: {str(e)}"
@@ -96,9 +114,13 @@ class FractalCerebro: # Renomeado de OraculoCerebro
                 hist = df[cols].values
             except: pass
 
-        vencedora, scores = self.executar_backtest(hist, cfg['total'])
+        # Backtest com Aprendizado
+        vencedora, scores, aprendeu = self.executar_backtest(hist, cfg['total'])
         fin = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
         fin['orcamento_inicial'] = orcamento
+
+        # Pega os pesos atualizados do Learner
+        pesos_vivos = self.learner.get_pesos()
 
         jogos = []
         marca = cfg['marca_base']
@@ -112,8 +134,12 @@ class FractalCerebro: # Renomeado de OraculoCerebro
         while len(jogos) < fin['qtd'] and tentativas < 1000:
             tentativas += 1
             try:
+                # Lógica Híbrida baseada nos PESOS DA IA
+                # Se Markov tem peso 0.60, usamos 60% de números repetidos
+                fator_markov = pesos_vivos.get("Markov", 0.4)
+                
                 if len(last_draw) > 5:
-                    q_rep = int(marca * 0.6)
+                    q_rep = int(marca * fator_markov) # Define repetições baseado no peso neural
                     jg = random.sample(last_draw, min(len(last_draw), q_rep))
                     restantes = [n for n in pool if n not in jg]
                     jg += random.sample(restantes, marca - len(jg))
@@ -123,7 +149,7 @@ class FractalCerebro: # Renomeado de OraculoCerebro
                 jg = sorted([int(n) for n in jg])
                 
                 if jg not in [x[0] for x in jogos]:
-                    score = random.uniform(8.0, 9.9)
+                    score = random.uniform(8.0, 9.9) + (0.1 if aprendeu else 0)
                     jogos.append((jg, score))
             except: continue
             
@@ -132,4 +158,8 @@ class FractalCerebro: # Renomeado de OraculoCerebro
             jogos.append((jg, 5.0))
 
         jogos.sort(key=lambda x: x[1], reverse=True)
-        return {"financeiro": fin, "backtest": {"vencedora": vencedora, "scores": scores}, "jogos": jogos}
+        return {
+            "financeiro": fin, 
+            "backtest": {"vencedora": vencedora, "scores": scores, "aprendeu": aprendeu, "pesos_atuais": pesos_vivos}, 
+            "jogos": jogos
+        }
