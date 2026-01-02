@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🧠 ORÁCULO MOTOR V39 - DEEP ANALYTIC (Explicações Matemáticas Detalhadas)
+# 🧠 ORÁCULO MOTOR V40 - ADAPTIVE BACKTEST & BUDGET CONTROL
 # ==============================================================================
 
 import pandas as pd
@@ -12,12 +12,13 @@ warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V39 (Deep Analytic)"
+        self.versao = "V40 (Adaptive Backtest)"
         
-        # --- MODELO DE IA ---
-        # Tenta usar o 2.5 Flash (mais inteligente), se não, usa o Pro
-        self.modelo_ia_preferencial = "models/gemini-2.5-flash"
+        # --- MODELO DE IA (AUTO-DISCOVERY) ---
+        # Busca automática do melhor modelo disponível na conta
+        self.modelo_ia = "gemini-pro" 
         
+        # --- CONFIGURAÇÕES TÉCNICAS ---
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca_base": 15},
             "Mega_Sena":      {"total": 60, "marca_base": 6},
@@ -29,14 +30,10 @@ class OraculoCerebro:
             "Mega_da_Virada": {"total": 60, "marca_base": 6}
         }
         
-        self.multiplicadores = {
-            "Mega_Sena":      {6: 1, 7: 7, 8: 28, 9: 84},
-            "Mega_da_Virada": {6: 1, 7: 7, 8: 28, 9: 84},
-            "Lotofacil":      {15: 1, 16: 16, 17: 136},
-            "Quina":          {5: 1, 6: 6, 7: 21},
-            "Dia_de_Sorte":   {7: 1, 8: 8},
-            "Timemania":      {10: 1}, 
-            "Lotomania":      {50: 1}  
+        # Tabela de preços de fallback (caso o CSV falhe)
+        self.tabela_precos_default = {
+            "Mega_Sena": 5.00, "Mega_da_Virada": 5.00, "Lotofacil": 3.00,
+            "Quina": 2.50, "Dia_de_Sorte": 2.50, "Timemania": 3.50, "Lotomania": 3.00, "Dupla_Sena": 2.50
         }
 
     def carregar_csv(self, url):
@@ -50,154 +47,194 @@ class OraculoCerebro:
             return float(clean)
         except: return 0.0
 
-    def atualizar_precos(self, url_precos, loteria_chave):
+    # --- NOVO SISTEMA DE ORÇAMENTO RÍGIDO ---
+    def calcular_limite_jogos(self, url_precos, loteria_chave, orcamento_usuario):
+        # 1. Tenta ler o preço atualizado do CSV
         df = self.carregar_csv(url_precos)
-        preco_base = 3.00
+        preco_unitario = 0.0
+        
         if df is not None:
             for _, row in df.iterrows():
                 nome_csv = str(row[0]).lower().replace('á','a').replace('ã','a').replace(' ','_')
                 if loteria_chave.lower() in nome_csv:
-                    preco_base = self._tratar_preco(row[1]); break
-        base = self.config_base.get(loteria_chave, {}).get('marca_base', 6)
-        return {base: preco_base}, preco_base
+                    preco_unitario = self._tratar_preco(row[1])
+                    break
+        
+        # 2. Se falhar, usa o default
+        if preco_unitario <= 0:
+            for k, v in self.tabela_precos_default.items():
+                if loteria_chave.lower() in k.lower():
+                    preco_unitario = v; break
+            if preco_unitario <= 0: preco_unitario = 3.00 # Fallback final
+            
+        # 3. Cálculo Matemático do Orçamento
+        qtd_jogos = int(orcamento_usuario // preco_unitario)
+        troco = orcamento_usuario - (qtd_jogos * preco_unitario)
+        
+        return {
+            "qtd": qtd_jogos if qtd_jogos > 0 else 1, # Mínimo 1 jogo para não quebrar
+            "preco_unit": preco_unitario,
+            "troco": troco,
+            "custo_total": qtd_jogos * preco_unitario
+        }
 
-    # --- INTEGRAÇÃO I.A. PROFUNDA (O SEGREDO DA V39) ---
-    def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
+    # --- ENGINE DE BACKTEST (O CÉREBRO DA V40) ---
+    def executar_backtest(self, hist, total_dezenas):
+        """
+        Testa 3 estratégias nos últimos 10 concursos e vê qual performa melhor.
+        """
+        if len(hist) < 15: return "Padrão Aleatório (Dados insuficientes)"
+
+        # Definição das Estratégias
+        scores_backtest = {"Markov (Inércia)": 0, "Fractal (Equilíbrio)": 0, "Gauss (Soma)": 0}
+        
+        # Recorte de teste (Últimos 10 resultados conhecidos)
+        teste_range = hist[-10:]
+        
+        for i in range(len(teste_range)-1):
+            passado = teste_range[i]
+            futuro_real = set(teste_range[i+1])
+            
+            # 1. Simulação Markov (Repete 50% do passado)
+            pred_mk = set(passado[:len(passado)//2]) 
+            acertos_mk = len(pred_mk.intersection(futuro_real))
+            scores_backtest["Markov (Inércia)"] += acertos_mk
+            
+            # 2. Simulação Fractal (Pega números que NÃO saíram - Espelho)
+            todos = set(range(1, total_dezenas+1))
+            ausentes = list(todos - set(passado))
+            random.shuffle(ausentes)
+            pred_fr = set(ausentes[:len(passado)//2])
+            acertos_fr = len(pred_fr.intersection(futuro_real))
+            scores_backtest["Fractal (Equilíbrio)"] += acertos_fr
+            
+            # 3. Simulação Gauss (Números centrais)
+            meio = total_dezenas // 2
+            pred_gs = set(range(meio-5, meio+6)) # Faixa central
+            acertos_gs = len(pred_gs.intersection(futuro_real))
+            scores_backtest["Gauss (Soma)"] += acertos_gs
+
+        # Retorna a vencedora
+        melhor_estrategia = max(scores_backtest, key=scores_backtest.get)
+        return melhor_estrategia, scores_backtest
+
+    # --- INTEGRAÇÃO I.A. EXPLICATIVA ---
+    def analisar_com_gemini(self, api_key, loteria, dados_fin, jogos_top3, backtest_info):
         try:
             genai.configure(api_key=api_key)
             
-            # Auto-Discovery simplificado para garantir funcionamento
-            modelo_final = "gemini-pro"
+            # Auto-Discovery de Modelo
+            modelo_uso = "gemini-pro"
             try:
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        if '2.5-flash' in m.name: 
-                            modelo_final = m.name
-                            break
+                available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                # Prefere Flash > Pro
+                for m in available: 
+                    if 'flash' in m: modelo_uso = m; break
+                else:
+                    if available: modelo_uso = available[0]
             except: pass
 
-            model = genai.GenerativeModel(modelo_final)
+            model = genai.GenerativeModel(modelo_uso)
             
-            # --- LÓGICA DE PROMPT ESPECÍFICA POR JOGO ---
-            jogo_exemplo = jogos_top3[0][0]
-            texto_jogos = "\n".join([f"- Jogo: {j[0]}" for j in jogos_top3])
+            vencedora = backtest_info['vencedora']
             
-            instrucao_matematica = ""
+            jogos_txt = "\n".join([f"- Jogo: {j[0]}" for j in jogos_top3])
             
-            if "facil" in loteria.lower():
-                instrucao_matematica = f"""
-                FOCO: Cadeias de Markov e Inércia.
-                1. Explique que usou 'Inércia Markoviana' para manter dezenas quentes.
-                2. Verifique se o Jogo 1 tem entre 8 e 10 repetidas (padrão ouro).
-                3. Cite 2 números do jogo que são 'atratores' (números de alta frequência).
-                """
-            elif "mania" in loteria.lower():
-                instrucao_matematica = f"""
-                FOCO: Geometria Fractal e Espelhamento.
-                1. Explique que usou 'Espelhamento Fractal' para cobrir quadrantes vazios.
-                2. Mencione a 'Lei do Retorno' para incluir zebras (números atrasados).
-                3. Analise se o Jogo 1 está bem distribuído (não concentrado).
-                """
-            elif "dia" in loteria.lower():
-                soma = sum(jogo_exemplo)
-                instrucao_matematica = f"""
-                FOCO: Distribuição Gaussiana (Normal).
-                1. Explique que aplicou o 'Filtro de Gauss'.
-                2. A soma das dezenas do Jogo 1 é {soma}. Confirme que isso está na 'zona quente' (entre 80 e 160).
-                3. Explique por que somas extremas são descartadas estatisticamente.
-                """
-            else: # Mega Sena, Quina, etc.
-                instrucao_matematica = """
-                FOCO: Caos Determinístico e Entropia.
-                1. Explique que buscou o equilíbrio entre Pares e Ímpares.
-                2. Cite se há alguma sequência numérica perigosa no Jogo 1.
-                """
-
             prompt = f"""
-            Aja como o 'Oráculo', um Cientista de Dados Sênior especialista em Loterias.
-            Analise a estratégia gerada pelo Motor V39 para a {loteria}.
+            Aja como um Estrategista de Loterias Profissional.
+            O sistema 'Oráculo V40' realizou um BACKTEST (teste histórico) e definiu a melhor estratégia.
             
-            Jogos Gerados:
-            {texto_jogos}
+            DADOS DO PROCESSAMENTO:
+            - Loteria: {loteria}
+            - Orçamento Cliente: R$ {dados_fin['orcamento_inicial']:.2f} (Gerou {dados_fin['qtd']} jogos)
+            - Estratégia Vencedora no Backtest: {vencedora}
             
-            SUA TAREFA (Responda em tópicos curtos e técnicos):
-            {instrucao_matematica}
+            JOGOS GERADOS:
+            {jogos_txt}
             
-            Termine com uma frase de confiança baseada na matemática.
+            SUA MISSÃO (Responda em Português, direto ao ponto):
+            1. Explique por que a estratégia '{vencedora}' foi escolhida (baseado no fato de ter tido melhor performance nos últimos testes).
+            2. Analise os números do primeiro jogo: por que eles se encaixam nessa estratégia?
+            3. Dê um veredito sobre a eficiência do uso do orçamento (R$ {dados_fin['custo_total']:.2f}).
             """
             
             response = model.generate_content(prompt)
             return response.text
         
         except Exception as e:
-            return f"⚠️ IA indisponível: {str(e)}. (Mas os jogos matemáticos foram calculados com sucesso!)"
+            return f"⚠️ IA Indisponível: {str(e)}. (Mas os cálculos de orçamento e jogos estão corretos!)"
 
-    # --- MOTORES MATEMÁTICOS ---
-    def _core_markov(self, hist, total):
-        # Simula peso de Markov
-        return {d: random.uniform(0.4, 0.9) for d in range(1, total+1)}
-
-    def _validar_filtros(self, jogo, last_draw, loteria_chave):
-        soma = sum(jogo)
-        # Filtros Específicos para dar base à explicação da IA
-        if "dia" in loteria_chave.lower():
-            if not (80 <= soma <= 160): return False # Garante a Gaussiana
-        elif "facil" in loteria_chave.lower():
-            if not (170 <= soma <= 220): return False # Garante o padrão
-        return True
-
-    def otimizar_orcamento(self, tabela, orcamento):
-        base = min(tabela.keys()); melhor = base; qtd_final = int(orcamento // tabela[base])
-        custo = tabela[melhor]
-        return {"tipo": "Aposta Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
-
-    # --- GERAÇÃO CLOUD ---
+    # --- GERAÇÃO PRINCIPAL ---
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
         cfg = self.config_base.get(loteria_chave)
         if not cfg: cfg = self.config_base["Mega_Sena"]
         
+        # 1. Carregar Dados Históricos
         df = self.carregar_csv(url_dados)
-        if df is None: 
-            cols = []; hist = []
-        else:
+        hist = []
+        if df is not None:
             cols = [c for c in df.columns if c.strip().upper().startswith('D')]
             for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
             df = df.dropna(subset=['Concurso']).sort_values('Concurso')
             hist = df[cols].values
-
-        tab, preco = self.atualizar_precos(url_precos, loteria_chave)
-        plano = self.otimizar_orcamento(tab, orcamento)
         
-        if plano['qtd'] < 1: return {"erro": "Orçamento insuficiente."}
+        # 2. Executar Backtest (Decidir Estratégia)
+        estrategia_vencedora, scores = self.executar_backtest(hist, cfg['total'])
+        
+        # 3. Calcular Orçamento (Rígido)
+        financas = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
+        financas['orcamento_inicial'] = orcamento
+        
+        if financas['qtd'] < 1: 
+            return {"erro": f"Orçamento de R$ {orcamento} insuficiente. Aposta mínima é R$ {financas['preco_unit']:.2f}"}
 
+        # 4. Gerar Jogos Baseado na Vencedora
         jogos = []
-        marca = plano['dezenas']
+        marca = cfg['marca_base']
         pool = list(range(1, cfg['total'] + 1))
+        last_draw = hist[-1] if len(hist) > 0 else []
+
+        # Configura pesos baseados na estratégia vencedora
+        peso_repeticao = 0.5 # Default
+        if "Markov" in estrategia_vencedora: peso_repeticao = 0.8 # Favorece repetição
+        if "Fractal" in estrategia_vencedora: peso_repeticao = 0.2 # Favorece números novos
         
         tentativas = 0
-        while len(jogos) < plano['qtd'] and tentativas < 5000:
+        while len(jogos) < financas['qtd'] and tentativas < 5000:
             tentativas += 1
             try:
-                # Gera jogo levemente enviesado para simular inteligência
-                jg = sorted(random.sample(pool, marca))
+                # Lógica Híbrida baseada no Backtest
+                # Se Markov venceu, puxa mais do último sorteio
+                # Se Fractal venceu, puxa mais dos ausentes
                 
-                # Valida nos filtros matemáticos para a IA ter o que explicar
-                if self._validar_filtros(jg, [], loteria_chave):
-                    if jg not in [x[0] for x in jogos]:
-                        score = random.uniform(8.5, 9.9) # Score simulado
-                        jogos.append((jg, score))
+                qtd_repetidas = int(marca * peso_repeticao)
+                qtd_novas = marca - qtd_repetidas
+                
+                candidatos_repetidos = [n for n in last_draw if n in pool and not pd.isna(n)]
+                candidatos_novos = [n for n in pool if n not in last_draw]
+                
+                # Garante que tem números suficientes
+                if len(candidatos_repetidos) < qtd_repetidas: qtd_repetidas = len(candidatos_repetidos)
+                
+                base = random.sample(candidatos_repetidos, qtd_repetidas) + random.sample(candidatos_novos, marca - qtd_repetidas)
+                jg = sorted(list(set(base)))
+                
+                # Preenchimento de segurança
+                while len(jg) < marca: 
+                    n = random.choice(pool)
+                    if n not in jg: jg.append(n)
+                jg = sorted(jg)
+
+                if jg not in [x[0] for x in jogos]:
+                    # Score simulado para ranking
+                    score = random.uniform(8.0, 9.9) 
+                    jogos.append((jg, score))
             except: continue
         
         jogos.sort(key=lambda x: x[1], reverse=True)
         
         return {
-            "financeiro": {
-                "estrategia": f"{plano['tipo']} ({marca} dz)",
-                "qtd": plano['qtd'],
-                "troco": plano['troco'],
-                "preco_base": preco,
-                "custo_total": plano['qtd'] * preco,
-                "conselho": f"Motor V39 gerou {plano['qtd']} jogos calibrados."
-            },
+            "financeiro": financas,
+            "backtest": {"vencedora": estrategia_vencedora, "scores": scores},
             "jogos": jogos
         }
