@@ -4,28 +4,20 @@ import meus_links
 import google.generativeai as genai
 
 # --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="FractalV 3.1 Big", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="FractalV 3.2 Stable", page_icon="🧬", layout="wide")
 
 # --- CSS PREMIUM (BIG NEUMORPHIC) ---
-# A correção está aqui: garantindo que as aspas fecham corretamente no final do bloco.
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
 
-    /* Estilo do Cartão Principal */
     .game-card {
-        background-color: #ffffff;
-        padding: 30px;
-        border-radius: 20px;
-        border-left: 8px solid #6c5ce7;
-        border: 1px solid #f0f2f5;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-        transition: transform 0.3s ease;
+        background-color: #ffffff; padding: 30px; border-radius: 20px;
+        border-left: 8px solid #6c5ce7; border: 1px solid #f0f2f5;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.08); margin-bottom: 25px; transition: transform 0.3s ease;
     }
     .game-card:hover { transform: translateY(-3px); }
 
-    /* Cabeçalho do Cartão */
     .card-header { 
         display: flex; justify-content: space-between; align-items: center; 
         margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f5f5f5; 
@@ -40,60 +32,51 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(108, 92, 231, 0.4);
     }
 
-    /* Container das Bolas */
-    .ball-container { 
-        display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding: 10px;
-    }
+    .ball-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding: 10px; }
 
-    /* ESTILO DAS BOLAS (AGORA MAIORES) */
     .ball {
-        width: 65px;  /* Tamanho grande */
-        height: 65px; 
-        border-radius: 50%; 
+        width: 65px; height: 65px; border-radius: 50%; 
         display: flex; align-items: center; justify-content: center;
-        
-        /* Tipografia Maior */
-        font-family: 'Roboto Mono', monospace; 
-        font-weight: 700; 
-        font-size: 28px; 
-        color: white;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.25);
-        
-        /* Efeito 3D Profundo */
-        box-shadow: 
-            inset 0px -5px 12px rgba(0,0,0,0.3), 
-            inset 0px 5px 12px rgba(255,255,255,0.25), 
-            0px 10px 20px -5px rgba(0,0,0,0.2);
-        border: 3px solid rgba(255,255,255,0.15); 
-        cursor: default; transition: all 0.2s;
+        font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 28px; 
+        color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.25);
+        box-shadow: inset 0px -5px 12px rgba(0,0,0,0.3), inset 0px 5px 12px rgba(255,255,255,0.25), 0px 10px 20px -5px rgba(0,0,0,0.2);
+        border: 3px solid rgba(255,255,255,0.15); cursor: default; transition: all 0.2s;
     }
-    .ball:hover { 
-        transform: scale(1.1); 
-        box-shadow: 0px 15px 30px -5px rgba(0,0,0,0.3);
-        z-index: 10;
-    }
+    .ball:hover { transform: scale(1.1); box-shadow: 0px 15px 30px -5px rgba(0,0,0,0.3); z-index: 10; }
 
-    /* Cores Vibrantes */
     .bg-roxo { background: radial-gradient(circle at 30% 30%, #be93d6, #8e44ad); }
     .bg-verde { background: radial-gradient(circle at 30% 30%, #58d68d, #27ae60); }
     .bg-azul { background: radial-gradient(circle at 30% 30%, #6dd5fa, #2980b9); }
     .bg-gold { background: radial-gradient(circle at 30% 30%, #f9e79f, #f1c40f); color: #333 !important; text-shadow: none; }
 
-    /* Botão */
     .stButton>button {
-        width: 100%; height: 60px;
-        background: linear-gradient(90deg, #6c5ce7, #a29bfe); 
-        color: white; font-size: 20px; font-weight: 800; 
-        border: none; border-radius: 15px;
+        width: 100%; height: 60px; background: linear-gradient(90deg, #6c5ce7, #a29bfe); 
+        color: white; font-size: 20px; font-weight: 800; border: none; border-radius: 15px;
     }
 </style>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)
+
+# --- FUNÇÃO DE CACHE (A SOLUÇÃO DO PISCA-PISCA) ---
+# Esta função congela o resultado. Se chamar de novo com os mesmos dados, ela devolve a memória.
+@st.cache_data(ttl=1800, show_spinner=False)
+def calcular_fractal_estavel(loteria_nome, orcamento, link_precos, url_dados):
+    # Instancia o cérebro dentro do cache
+    cerebro = fractal_motor.FractalCerebro()
+    chave_norm = loteria_nome.replace("á","a").replace("ç","c").replace(" ","_")
+    
+    # Executa o cálculo pesado
+    resultado = cerebro.gerar_palpite_cloud(
+        url_dados, link_precos, chave_norm, orcamento
+    )
+    return resultado, cerebro # Retorna o cérebro também para usar a IA depois
+
+# --------------------------------------------------
 
 # --- HEADER ---
 c1, c2 = st.columns([1, 6])
 with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
 with c2: 
-    st.title("FractalV 3.1")
+    st.title("FractalV 3.2")
     st.markdown("### Inteligência Determinística & Visual Studio")
 
 try:
@@ -117,14 +100,13 @@ with st.sidebar:
     else:
         gemini_key = st.text_input("API Key (Gemini):", type="password")
     
+    # SELETOR DE MODELOS (IA)
     modelo_selecionado = "gemini-pro"
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
-            # Lista modelos
             raw_models = genai.list_models()
             modelos_uteis = [m.name for m in raw_models if 'generateContent' in m.supported_generation_methods and 'gemini' in m.name]
-            
             st.divider()
             st.markdown("🤖 **Cérebro IA**")
             modelo_selecionado = st.selectbox("Versão:", modelos_uteis, index=0)
@@ -133,17 +115,20 @@ with st.sidebar:
     st.divider()
     loteria = st.selectbox("Modalidade:", list(SHEETS.keys()))
     orcamento = st.number_input("Capital (R$):", min_value=1.0, value=50.0, step=1.0)
-    st.caption(f"Engine: {modelo_selecionado}")
+    
+    # Botão para limpar o cache se o usuário quiser forçar novos números
+    if st.button("🔄 Forçar Recálculo"):
+        st.cache_data.clear()
+        st.rerun()
 
 # --- CORE ---
 if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
     with st.spinner("⚛️ Materializando dados quânticos..."):
         try:
-            cerebro = fractal_motor.FractalCerebro()
-            chave_norm = loteria.replace("á","a").replace("ç","c").replace(" ","_")
-            
-            res = cerebro.gerar_palpite_cloud(
-                SHEETS[loteria]['url'], LINK_TABELA_PRECOS, chave_norm, orcamento
+            # CHAMA A FUNÇÃO COM CACHE
+            # Se você clicar de novo, ele pula esta parte e pega da memória instantaneamente
+            res, cerebro_ativo = calcular_fractal_estavel(
+                loteria, orcamento, LINK_TABELA_PRECOS, SHEETS[loteria]['url']
             )
             
             if "erro" in res:
@@ -153,7 +138,8 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 jogos = res['jogos']
                 meta = res['backtest']
                 
-                st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta['ultimo_concurso']}")
+                # Exibe aviso de estabilidade
+                st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta.get('ultimo_concurso', 'N/A')}. (Dados mantidos para consistência).")
 
                 # KPI
                 st.markdown("### 🧠 Plasticidade Neural")
@@ -164,11 +150,12 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 cols[2].metric("Gauss", f"{pesos['Gauss']*100:.0f}%")
                 st.progress(max(pesos.values()))
 
-                # IA
+                # IA (GEMINI) - Esta parte roda sempre para permitir mudar o modelo
                 if gemini_key:
                     with st.chat_message("assistant", avatar="🧬"):
                         st.markdown(f"**Análise ({modelo_selecionado}):**")
-                        analise = cerebro.analisar_com_gemini(
+                        # Usamos o cérebro que veio do cache
+                        analise = cerebro_ativo.analisar_com_gemini(
                             gemini_key, modelo_selecionado, loteria, fin, jogos[:3], meta
                         )
                         st.write(analise)
@@ -180,7 +167,6 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 for i, (jg, score) in enumerate(jogos):
                     bolas_html = ""
                     for num in jg:
-                        # GERAÇÃO DAS BOLAS GRANDES
                         bolas_html += f'<div class="ball {css_class}">{int(num):02d}</div>'
                     
                     st.markdown(f"""
