@@ -1,173 +1,27 @@
-# ==============================================================================
-# 🧠 FRACTAL MOTOR V3.1 - DETERMINISTIC CORE
-# ==============================================================================
-import pandas as pd
-import numpy as np
-import random
-import google.generativeai as genai
-import warnings
-import fractal_learner
-
-warnings.filterwarnings("ignore")
-
-class FractalCerebro:
-    def __init__(self):
-        # Atualizado para bater com a interface gráfica
-        self.versao = "FractalV 3.1 (Deterministic)"
-        self.learner = fractal_learner.FractalLearner()
-        
-        self.config_base = {
-            "Lotofacil": {"total": 25, "marca_base": 15}, "Mega_Sena": {"total": 60, "marca_base": 6},
-            "Quina": {"total": 80, "marca_base": 5}, "Dia_de_Sorte": {"total": 31, "marca_base": 7},
-            "Timemania": {"total": 80, "marca_base": 10}, "Dupla_Sena": {"total": 50, "marca_base": 6},
-            "Lotomania": {"total": 100,"marca_base": 50}, "Mega_da_Virada": {"total": 60, "marca_base": 6}
-        }
-
-    def carregar_csv(self, url):
-        try: return pd.read_csv(url, on_bad_lines='skip')
-        except: return None
-
-    def _tratar_preco(self, valor_str):
-        try:
-            if isinstance(valor_str, (int, float)): return float(valor_str)
-            clean = str(valor_str).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
-            return float(clean)
-        except: return 0.0
-
-    def calcular_limite_jogos(self, url_precos, loteria_chave, orcamento_usuario):
-        preco_unitario = 3.00 
-        try:
-            df = self.carregar_csv(url_precos)
-            if df is not None:
-                for _, row in df.iterrows():
-                    if loteria_chave.lower() in str(row[0]).lower().replace(' ','_'):
-                        val = self._tratar_preco(row[1])
-                        if val > 0: preco_unitario = val; break
-        except: pass
-
-        qtd_jogos = int(orcamento_usuario // preco_unitario)
-        return {"qtd": max(1, qtd_jogos), "preco_unit": preco_unitario, "troco": orcamento_usuario - (qtd_jogos * preco_unitario), "custo_total": qtd_jogos * preco_unitario}
-
-    def executar_backtest(self, hist, total_dezenas):
-        if len(hist) < 5: return "Padrão Fractal", {}, False
-        scores = {"Markov": 0, "Fractal": 0, "Gauss": 0}
-        try:
-            teste = hist[-5:]
-            for i in range(len(teste)-1):
-                passado = set([int(x) for x in teste[i] if pd.notna(x)])
-                futuro = set([int(x) for x in teste[i+1] if pd.notna(x)])
+st.subheader(f"Sequências Otimizadas ({len(jogos)})")
                 
-                # Lógica de Pontuação do Backtest
-                scores["Markov"] += len(passado.intersection(futuro))
+                css_class = SHEETS[loteria].get("css", "bg-azul")
                 
-                ausentes = set(range(1, total_dezenas+1)) - passado
-                scores["Fractal"] += len(ausentes.intersection(futuro))
-                
-                # Gauss (Simplificado para performance)
-                meio = total_dezenas // 2
-                gauss_zone = set(range(meio-5, meio+6))
-                scores["Gauss"] += len(gauss_zone.intersection(futuro))
-
-        except: pass
-        
-        vencedora = max(scores, key=scores.get)
-        # O Learner aprende com o passado recente
-        aprendeu, quem = self.learner.regenerar_pesos(vencedora)
-        return vencedora, scores, aprendeu
-
-    def analisar_com_gemini(self, api_key, modelo_escolhido, loteria, dados_fin, jogos_top3, backtest_info):
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(modelo_escolhido)
-            
-            vencedora = backtest_info.get('vencedora', 'Padrão')
-            pesos = self.learner.get_pesos()
-            
-            # Prompt atualizado com o novo nome
-            prompt = f"""
-            Atue como o núcleo inteligente do Sistema FractalV (Versão 3.1).
-            Analise estes palpites matemáticos para {loteria}.
-            
-            1. Modelo Matemático Vencedor: {vencedora} (Validado por Backtest).
-            2. Pesos Neurais Atuais: Markov({pesos['Markov']:.2f}) | Fractal({pesos['Fractal']:.2f}).
-            3. Jogo Principal Gerado:
-            {jogos_top3[0][0]}
-            
-            Responda em Português (técnico e direto):
-            - Por que o algoritmo escolheu a estratégia '{vencedora}' hoje?
-            - Qual a probabilidade teórica baseada na entropia dos números selecionados?
-            """
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e: return f"⚠️ Erro na IA ({modelo_escolhido}): {str(e)}"
-
-    def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
-        cfg = self.config_base.get(loteria_chave, self.config_base["Mega_Sena"])
-        
-        df = self.carregar_csv(url_dados)
-        hist = []
-        last_concurso_id = 0
-        
-        if df is not None:
-            try:
-                cols = [c for c in df.columns if c.strip().upper().startswith('D')]
-                for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
-                df = df.dropna(subset=['Concurso']).sort_values('Concurso')
-                hist = df[cols].values
-                last_concurso_id = int(df['Concurso'].iloc[-1])
-            except: pass
-
-        vencedora, scores, aprendeu = self.executar_backtest(hist, cfg['total'])
-        fin = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
-        fin['orcamento_inicial'] = orcamento
-        pesos_vivos = self.learner.get_pesos()
-
-        # --- SEMENTE DETERMINÍSTICA FRACTAL ---
-        # Garante que a decisão se mantém firme até o próximo concurso
-        seed_val = f"FractalV3.1_{loteria_chave}_{last_concurso_id}_{vencedora}_{fin['qtd']}"
-        random.seed(seed_val) 
-        # --------------------------------------
-
-        jogos = []
-        marca = cfg['marca_base']
-        pool = list(range(1, cfg['total'] + 1))
-        
-        last_draw = []
-        if len(hist) > 0:
-            last_draw = [int(x) for x in hist[-1] if pd.notna(x)]
-
-        tentativas = 0
-        while len(jogos) < fin['qtd'] and tentativas < 2000:
-            tentativas += 1
-            try:
-                fator_markov = pesos_vivos.get("Markov", 0.4)
-                
-                if len(last_draw) > 5:
-                    q_rep = int(marca * fator_markov)
-                    jg = random.sample(last_draw, min(len(last_draw), q_rep))
-                    restantes = [n for n in pool if n not in jg]
-                    jg += random.sample(restantes, marca - len(jg))
-                else:
-                    jg = random.sample(pool, marca)
-                
-                jg = sorted([int(n) for n in jg])
-                
-                if jg not in [x[0] for x in jogos]:
-                    score = random.uniform(8.0, 9.9) + (0.1 if aprendeu else 0)
-                    jogos.append((jg, score))
-            except: continue
-            
-        if not jogos:
-            jg = sorted(random.sample(pool, marca))
-            jogos.append((jg, 5.0))
-
-        jogos.sort(key=lambda x: x[1], reverse=True)
-        
-        # Libera a semente para não afetar outros processos
-        random.seed(None) 
-        
-        return {
-            "financeiro": fin, 
-            "backtest": {"vencedora": vencedora, "scores": scores, "aprendeu": aprendeu, "pesos_atuais": pesos_vivos, "ultimo_concurso": last_concurso_id}, 
-            "jogos": jogos
-        }
+                # ATENÇÃO: Agora desempacotamos 3 valores: jg, score, entropia
+                for i, (jg, score, entropia) in enumerate(jogos):
+                    bolas_html = ""
+                    for num in jg:
+                        bolas_html += f'<div class="ball {css_class}">{int(num):02d}</div>'
+                    
+                    # Define cor da barra de entropia
+                    cor_entropia = "#e74c3c" # Vermelho (Caos/Baixa)
+                    if entropia > 0.6: cor_entropia = "#2ecc71" # Verde (Equilibrada)
+                    elif entropia > 0.4: cor_entropia = "#f1c40f" # Amarelo
+                    
+                    st.markdown(f"""
+                    <div class="game-card">
+                        <div class="card-header">
+                            <span class="game-title">JOGO #{i+1:02d}</span>
+                            <div style="text-align: right;">
+                                <span class="game-score">SCORE: {score:.2f}</span>
+                                <br>
+                                <small style="color: #777; font-size: 10px;">ENTROPIA: <span style="color:{cor_entropia}"><b>{entropia:.4f}</b></span></small>
+                            </div>
+                        </div>
+                        <div class="ball-container">{bolas_html}</div>
+                    </div>""", unsafe_allow_html=True)
