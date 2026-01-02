@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🧠 FRACTAL MOTOR V3.0 - DETERMINISTIC CORE
+# 🧠 FRACTAL MOTOR V3.1 - DETERMINISTIC CORE
 # ==============================================================================
 import pandas as pd
 import numpy as np
@@ -12,7 +12,8 @@ warnings.filterwarnings("ignore")
 
 class FractalCerebro:
     def __init__(self):
-        self.versao = "FractalV 3.0 (Deterministic)"
+        # Atualizado para bater com a interface gráfica
+        self.versao = "FractalV 3.1 (Deterministic)"
         self.learner = fractal_learner.FractalLearner()
         
         self.config_base = {
@@ -55,39 +56,46 @@ class FractalCerebro:
             for i in range(len(teste)-1):
                 passado = set([int(x) for x in teste[i] if pd.notna(x)])
                 futuro = set([int(x) for x in teste[i+1] if pd.notna(x)])
-                # Lógica simplificada de pontuação
+                
+                # Lógica de Pontuação do Backtest
                 scores["Markov"] += len(passado.intersection(futuro))
+                
                 ausentes = set(range(1, total_dezenas+1)) - passado
                 scores["Fractal"] += len(ausentes.intersection(futuro))
+                
+                # Gauss (Simplificado para performance)
+                meio = total_dezenas // 2
+                gauss_zone = set(range(meio-5, meio+6))
+                scores["Gauss"] += len(gauss_zone.intersection(futuro))
+
         except: pass
         
         vencedora = max(scores, key=scores.get)
+        # O Learner aprende com o passado recente
         aprendeu, quem = self.learner.regenerar_pesos(vencedora)
         return vencedora, scores, aprendeu
 
-    # --- NOVIDADE: RECEBE O MODELO ESCOLHIDO PELO USUÁRIO ---
     def analisar_com_gemini(self, api_key, modelo_escolhido, loteria, dados_fin, jogos_top3, backtest_info):
         try:
             genai.configure(api_key=api_key)
-            
-            # Usa estritamente o modelo que o usuário mandou
             model = genai.GenerativeModel(modelo_escolhido)
             
             vencedora = backtest_info.get('vencedora', 'Padrão')
             pesos = self.learner.get_pesos()
             
+            # Prompt atualizado com o novo nome
             prompt = f"""
-            Atue como o Sistema FractalV.
-            Analise estes palpites para {loteria}.
+            Atue como o núcleo inteligente do Sistema FractalV (Versão 3.1).
+            Analise estes palpites matemáticos para {loteria}.
             
-            1. Modelo Matemático Ativo: {vencedora} (Baseado no último Backtest).
-            2. Estado Neural: Markov({pesos['Markov']:.2f}) | Fractal({pesos['Fractal']:.2f}).
-            3. Jogos Gerados:
+            1. Modelo Matemático Vencedor: {vencedora} (Validado por Backtest).
+            2. Pesos Neurais Atuais: Markov({pesos['Markov']:.2f}) | Fractal({pesos['Fractal']:.2f}).
+            3. Jogo Principal Gerado:
             {jogos_top3[0][0]}
             
-            Responda em Português:
-            - Por que manteve/mudou a estratégia em relação ao concurso anterior?
-            - Qual a probabilidade teórica baseada na inércia dos números?
+            Responda em Português (técnico e direto):
+            - Por que o algoritmo escolheu a estratégia '{vencedora}' hoje?
+            - Qual a probabilidade teórica baseada na entropia dos números selecionados?
             """
             response = model.generate_content(prompt)
             return response.text
@@ -98,7 +106,7 @@ class FractalCerebro:
         
         df = self.carregar_csv(url_dados)
         hist = []
-        last_concurso_id = 0 # Identificador para a Semente
+        last_concurso_id = 0
         
         if df is not None:
             try:
@@ -106,22 +114,19 @@ class FractalCerebro:
                 for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
                 df = df.dropna(subset=['Concurso']).sort_values('Concurso')
                 hist = df[cols].values
-                # Pega o número do último concurso para travar a decisão
                 last_concurso_id = int(df['Concurso'].iloc[-1])
             except: pass
 
-        # Backtest
         vencedora, scores, aprendeu = self.executar_backtest(hist, cfg['total'])
         fin = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
         fin['orcamento_inicial'] = orcamento
         pesos_vivos = self.learner.get_pesos()
 
-        # --- ESTABILIDADE DETERMINÍSTICA (A DECISÃO FIRME) ---
-        # Criamos uma semente única baseada na Loteria + Último Resultado + Estratégia Vencedora
-        # Se nada disso mudar, os números gerados serão IDÊNTICOS (Inércia de Decisão)
-        seed_val = f"{loteria_chave}_{last_concurso_id}_{vencedora}_{fin['qtd']}"
+        # --- SEMENTE DETERMINÍSTICA FRACTAL ---
+        # Garante que a decisão se mantém firme até o próximo concurso
+        seed_val = f"FractalV3.1_{loteria_chave}_{last_concurso_id}_{vencedora}_{fin['qtd']}"
         random.seed(seed_val) 
-        # -----------------------------------------------------
+        # --------------------------------------
 
         jogos = []
         marca = cfg['marca_base']
@@ -131,7 +136,6 @@ class FractalCerebro:
         if len(hist) > 0:
             last_draw = [int(x) for x in hist[-1] if pd.notna(x)]
 
-        # Geração com Seed Travada
         tentativas = 0
         while len(jogos) < fin['qtd'] and tentativas < 2000:
             tentativas += 1
@@ -149,7 +153,6 @@ class FractalCerebro:
                 jg = sorted([int(n) for n in jg])
                 
                 if jg not in [x[0] for x in jogos]:
-                    # O score também será determinístico agora
                     score = random.uniform(8.0, 9.9) + (0.1 if aprendeu else 0)
                     jogos.append((jg, score))
             except: continue
@@ -160,7 +163,7 @@ class FractalCerebro:
 
         jogos.sort(key=lambda x: x[1], reverse=True)
         
-        # IMPORTANTE: Destravar o random para não afetar outras partes do sistema se necessário
+        # Libera a semente para não afetar outros processos
         random.seed(None) 
         
         return {
