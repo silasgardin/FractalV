@@ -1,5 +1,6 @@
 # ==============================================================================
-# 🧠 ORÁCULO MOTOR V35 - GEMINI 2.5 FLASH EDITION
+# 🧠 ORÁCULO MOTOR V35 - GEMINI PRO STABLE
+# (Correção para erro 404 - Modelo Universal)
 # ==============================================================================
 
 import pandas as pd
@@ -13,11 +14,10 @@ warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V35 (Gemini 2.5 Flash)"
+        self.versao = "V35 (Gemini Pro Stable)"
         
-        # --- CONFIGURAÇÃO DO MODELO DE IA ---
-        # Aqui definimos explicitamente a versão que você está usando
-        self.modelo_ia_nome = "gemini-2.5-flash" 
+        # --- CONFIGURAÇÃO FORÇADA PARA O MODELO ESTÁVEL ---
+        self.modelo_ia_nome = "gemini-pro"
         
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca_base": 15},
@@ -78,7 +78,7 @@ class OraculoCerebro:
             
         return tabela, preco_base
 
-    # --- MOTORES MATEMÁTICOS ---
+    # --- MATEMÁTICA FRACTAL ---
     def _core_markov(self, hist, total):
         matriz = np.zeros((total + 1, total + 1)); recorte = hist[-100:]
         for i in range(len(recorte)-1):
@@ -149,13 +149,13 @@ class OraculoCerebro:
         custo = tabela[melhor]
         return {"tipo": "Combo" if melhor > base else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
 
-    # --- INTEGRAÇÃO COM GEMINI 2.5 FLASH ---
+    # --- ANÁLISE DE I.A. (GEMINI PRO) ---
     def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
         try:
             genai.configure(api_key=api_key)
             
-            # Usa o nome exato que você pediu
-            model = genai.GenerativeModel(self.modelo_ia_nome)
+            # Utilizando 'gemini-pro' (Modelo Universal)
+            model = genai.GenerativeModel('gemini-pro')
             
             jogos_texto = "\n".join([f"- Jogo: {j[0]} (Score Mat: {j[1]:.2f})" for j in jogos_top3])
             
@@ -168,7 +168,7 @@ class OraculoCerebro:
             {jogos_texto}
             
             Responda em Português (máx 3 linhas):
-            - Por que esta estratégia de {estrategia_fin['estrategia']} é boa?
+            - Por que esta estratégia financeira é eficiente?
             - Cite uma curiosidade estatística sobre os números do primeiro jogo.
             """
             
@@ -176,15 +176,7 @@ class OraculoCerebro:
             return response.text
         
         except Exception as e:
-            # Fallback seguro: se o 2.5 falhar, tenta o 'gemini-pro' automaticamente
-            try:
-                if "404" in str(e) or "not found" in str(e).lower():
-                    model_bkp = genai.GenerativeModel('gemini-pro')
-                    response = model_bkp.generate_content(prompt)
-                    return f"(Nota: Usei o gemini-pro pois o {self.modelo_ia_nome} não respondeu)\n\n" + response.text
-                return f"⚠️ Erro na IA: {str(e)}"
-            except:
-                return f"⚠️ IA indisponível no momento: {str(e)}"
+            return f"⚠️ IA indisponível: {str(e)}"
 
     # --- GERAÇÃO CLOUD ---
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
