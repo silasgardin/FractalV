@@ -1,9 +1,11 @@
 # ==============================================================================
-# 🔌 FRACTAL CONNECTOR - CORREÇÃO DE LEITURA (LAST GAME FIX)
+# 🔌 FRACTAL CONNECTOR V4.3 - COM QUEBRA DE CACHE DO GOOGLE
 # ARQUIVO: fractal_connector.py
 # ==============================================================================
 import pandas as pd
 import meus_links
+import time
+import random
 
 class FractalConnector:
     def __init__(self):
@@ -30,7 +32,9 @@ class FractalConnector:
     def get_preco(self, loteria_nome):
         preco_padrao = 3.00
         try:
-            df = pd.read_csv(self.url_precos, on_bad_lines='skip')
+            # Cache Buster também aqui
+            url_fresca = f"{self.url_precos}&v={int(time.time())}"
+            df = pd.read_csv(url_fresca, on_bad_lines='skip')
             nome_alvo = self.mapa_nomes.get(loteria_nome, loteria_nome).lower()
             for _, row in df.iterrows():
                 nome_csv = str(row[0]).lower().replace('á','a').replace('ã','a').replace('_', ' ')
@@ -47,41 +51,36 @@ class FractalConnector:
         if not url: return None, 0
         
         try:
-            # 1. Lê o CSV
-            df = pd.read_csv(url, on_bad_lines='skip')
+            # --- O TRUQUE DO CACHE BUSTER ---
+            # Adiciona um numero aleatório no fim do link para enganar o Google
+            # e forçar ele a entregar a planilha atualizada AGORA.
+            url_fresca = f"{url}&cache_buster={int(time.time())}_{random.randint(1,9999)}"
             
-            # 2. Identifica colunas (Concurso e Bolas)
-            # Normaliza o nome das colunas para evitar erros de maiúsculas/minúsculas
+            df = pd.read_csv(url_fresca, on_bad_lines='skip')
+            
+            # Normaliza colunas
             df.columns = [c.strip() for c in df.columns]
             
-            # Procura coluna de Concurso
+            # Localiza coluna concurso
             col_concurso = None
             for c in df.columns:
                 if 'concurso' in c.lower():
                     col_concurso = c
                     break
-            
-            if not col_concurso:
-                # Tenta pegar a primeira coluna se não achar o nome "Concurso"
-                col_concurso = df.columns[0]
+            if not col_concurso: col_concurso = df.columns[0]
 
-            # 3. LIMPEZA CRÍTICA: Força "Concurso" a ser Numérico e Remove Vazios
+            # Limpeza e Ordenação
             df[col_concurso] = pd.to_numeric(df[col_concurso], errors='coerce')
-            df = df.dropna(subset=[col_concurso]) # Remove linhas onde concurso é NaN
-            df = df[df[col_concurso] > 0] # Garante que é maior que zero
-            
-            # 4. ORDENAÇÃO MATEMÁTICA (Garante que o último é o maior número)
+            df = df.dropna(subset=[col_concurso])
+            df = df[df[col_concurso] > 0]
             df = df.sort_values(by=col_concurso, ascending=True)
 
-            # 5. Pega as colunas de dezenas (Bolas)
+            # Extração
             cols_dezenas = [c for c in df.columns if str(c).strip().upper().startswith('D') or 'bola' in str(c).lower()]
-            
-            # Garante que as dezenas também são números
             for c in cols_dezenas: df[c] = pd.to_numeric(df[c], errors='coerce')
             
-            # 6. Retorna Dados
             historico = df[cols_dezenas].values
-            ultimo_conc_id = int(df[col_concurso].iloc[-1]) # Pega o último da lista ordenada
+            ultimo_conc_id = int(df[col_concurso].iloc[-1])
             
             return historico, ultimo_conc_id
             
