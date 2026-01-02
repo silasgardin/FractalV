@@ -1,4 +1,7 @@
-# oraculo_motor.py - V35 (Gemini Pro Stable Fixed)
+# ==============================================================================
+# 🧠 ORÁCULO MOTOR V35 - GEMINI 2.5 FLASH EDITION
+# ==============================================================================
+
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
@@ -10,9 +13,12 @@ warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V35 (Gemini Pro Stable)"
+        self.versao = "V35 (Gemini 2.5 Flash)"
         
-        # Configurações de Jogo
+        # --- CONFIGURAÇÃO DO MODELO DE IA ---
+        # Aqui definimos explicitamente a versão que você está usando
+        self.modelo_ia_nome = "gemini-2.5-flash" 
+        
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca_base": 15},
             "Mega_Sena":      {"total": 60, "marca_base": 6},
@@ -72,7 +78,7 @@ class OraculoCerebro:
             
         return tabela, preco_base
 
-    # --- MATEMÁTICA ---
+    # --- MOTORES MATEMÁTICOS ---
     def _core_markov(self, hist, total):
         matriz = np.zeros((total + 1, total + 1)); recorte = hist[-100:]
         for i in range(len(recorte)-1):
@@ -143,38 +149,44 @@ class OraculoCerebro:
         custo = tabela[melhor]
         return {"tipo": "Combo" if melhor > base else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
 
-    # --- CORREÇÃO DO GEMINI (AQUI ESTÁ A MUDANÇA) ---
+    # --- INTEGRAÇÃO COM GEMINI 2.5 FLASH ---
     def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
         try:
-            # Configuração segura
             genai.configure(api_key=api_key)
             
-            # Mudei de 'gemini-1.5-flash' para 'gemini-pro'
-            # 'gemini-pro' é o modelo mais estável e universalmente suportado
-            model = genai.GenerativeModel('gemini-pro')
+            # Usa o nome exato que você pediu
+            model = genai.GenerativeModel(self.modelo_ia_nome)
             
             jogos_texto = "\n".join([f"- Jogo: {j[0]} (Score Mat: {j[1]:.2f})" for j in jogos_top3])
             
             prompt = f"""
-            Aja como um Matemático Especialista em Loterias.
-            Analise os dados gerados pelo meu algoritmo para a {loteria}:
+            Você é o 'Oráculo', um matemático especialista em loterias.
+            Analise os dados gerados para a {loteria}:
             
-            1. Estratégia Financeira: {estrategia_fin['estrategia']}
-            2. Jogos Gerados (Top 3):
+            1. Estratégia: {estrategia_fin['estrategia']}
+            2. Jogos (Top 3):
             {jogos_texto}
             
-            Responda em Português (máx 4 linhas):
-            - Por que esta estratégia financeira é eficiente?
-            - Cite uma observação curiosa sobre os números do primeiro jogo (pares/ímpares ou repetições).
+            Responda em Português (máx 3 linhas):
+            - Por que esta estratégia de {estrategia_fin['estrategia']} é boa?
+            - Cite uma curiosidade estatística sobre os números do primeiro jogo.
             """
             
             response = model.generate_content(prompt)
             return response.text
+        
         except Exception as e:
-            # Retorna o erro de forma amigável sem quebrar o app
-            return f"⚠️ Nota: O Gemini (IA) não pôde responder agora ({str(e)}), mas os seus jogos matemáticos acima estão 100% corretos e prontos para usar!"
+            # Fallback seguro: se o 2.5 falhar, tenta o 'gemini-pro' automaticamente
+            try:
+                if "404" in str(e) or "not found" in str(e).lower():
+                    model_bkp = genai.GenerativeModel('gemini-pro')
+                    response = model_bkp.generate_content(prompt)
+                    return f"(Nota: Usei o gemini-pro pois o {self.modelo_ia_nome} não respondeu)\n\n" + response.text
+                return f"⚠️ Erro na IA: {str(e)}"
+            except:
+                return f"⚠️ IA indisponível no momento: {str(e)}"
 
-    # --- EXECUÇÃO ---
+    # --- GERAÇÃO CLOUD ---
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
         cfg = self.config_base.get(loteria_chave)
         if not cfg:
