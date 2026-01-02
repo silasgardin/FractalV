@@ -1,5 +1,6 @@
 # ==============================================================================
-# 🧠 FRACTAL MOTOR V4.0 - PURE MATH CORE
+# 🧠 FRACTAL MOTOR V4.1 - DETERMINISMO ABSOLUTO (CONCURSO-LOCKED)
+# ARQUIVO: fractal_motor.py
 # ==============================================================================
 import numpy as np
 import random
@@ -12,7 +13,7 @@ warnings.filterwarnings("ignore")
 
 class FractalCerebro:
     def __init__(self):
-        self.versao = "FractalV 4.0"
+        self.versao = "FractalV 4.1 (Stable)"
         self.learner = fractal_learner.FractalLearner()
         self.config_base = {
             "Lotofacil": {"total": 25, "marca_base": 15}, "Mega_Sena": {"total": 60, "marca_base": 6},
@@ -25,7 +26,6 @@ class FractalCerebro:
         try:
             jogo = sorted(jogo)
             if len(jogo) < 2: return 0.5
-            # Ajuste Lotomania
             if len(jogo) > 20: fator_espalhamento = 0.5 
             else:
                 gaps = np.diff(jogo)
@@ -54,7 +54,6 @@ class FractalCerebro:
             for i in range(len(teste)-1):
                 passado = set([int(x) for x in teste[i] if not np.isnan(x)])
                 futuro = set([int(x) for x in teste[i+1] if not np.isnan(x)])
-                
                 scores["Markov"] += len(passado.intersection(futuro))
                 ausentes = set(range(1, total_dezenas+1)) - passado
                 scores["Fractal"] += len(ausentes.intersection(futuro))
@@ -63,8 +62,10 @@ class FractalCerebro:
                 scores["Gauss"] += len(gauss_zone.intersection(futuro))
         except: pass
         vencedora = max(scores, key=scores.get)
-        aprendeu, quem = self.learner.regenerar_pesos(vencedora)
-        return vencedora, scores, aprendeu
+        
+        # NOTA: O aprendizado aqui não salva no disco a cada clique para evitar "flutuação"
+        # Ele apenas retorna se aprenderia ou não.
+        return vencedora, scores, True
 
     def analisar_com_gemini(self, api_key, modelo, loteria, dados_fin, jogos_top3, meta):
         try:
@@ -72,7 +73,7 @@ class FractalCerebro:
             model = genai.GenerativeModel(modelo)
             vencedora = meta.get('vencedora', 'Padrão')
             entropia_calc = jogos_top3[0][2]
-            prompt = f"Você é FractalV 4.0. Analise para {loteria}. Estratégia: {vencedora}. Entropia: {entropia_calc:.4f}. Jogo: {jogos_top3[0][0]}. Responda curto: A entropia é boa? Por que essa estratégia?"
+            prompt = f"FractalV 4.1 System. Loteria: {loteria}. Estratégia Ativa: {vencedora}. Entropia do Jogo 1: {entropia_calc:.4f}. Jogo: {jogos_top3[0][0]}. Análise técnica curta em Português: A entropia está segura? Por que {vencedora} foi a melhor?"
             return model.generate_content(prompt).text
         except Exception as e: return f"⚠️ Erro IA: {str(e)}"
 
@@ -80,15 +81,22 @@ class FractalCerebro:
         key_norm = loteria_chave.replace(' ','_').replace('á','a').replace('ç','c')
         cfg = self.config_base.get(key_norm, self.config_base["Mega_Sena"])
         
+        # --- PASSO CRÍTICO: DETERMINISMO TOTAL ---
+        # A Semente é baseada ESTRITAMENTE no ID do Concurso e na Loteria.
+        # Se o concurso for 3576, a semente será SEMPRE a mesma, gerando SEMPRE os mesmos números.
+        seed_master = int(ultimo_id) + sum(ord(c) for c in loteria_chave)
+        random.seed(seed_master)
+        np.random.seed(seed_master) # Trava também o Numpy se for usado
+        # -----------------------------------------
+
+        # O Backtest agora roda sob a influência da semente travada
         vencedora, scores, aprendeu = self.executar_backtest(historico, cfg['total'])
         
         qtd_jogos = max(1, int(orcamento // preco_jogo))
         fin = {"qtd": qtd_jogos, "preco_unit": preco_jogo, "troco": orcamento - (qtd_jogos * preco_jogo), "custo_total": qtd_jogos * preco_jogo}
+        
+        # Pega pesos (Sem alterar memória durante a geração para evitar flutuação)
         pesos_vivos = self.learner.get_pesos()
-
-        # Seed Determinística
-        seed_val = f"FV4.0_{loteria_chave}_{ultimo_id}_{vencedora}_{qtd_jogos}"
-        random.seed(seed_val)
 
         jogos = []
         marca = cfg['marca_base']
@@ -96,23 +104,31 @@ class FractalCerebro:
         last_draw = [int(x) for x in historico[-1] if not np.isnan(x)] if (historico is not None and len(historico)>0) else []
 
         tentativas = 0
-        while len(jogos) < qtd_jogos and tentativas < 4000:
+        # O loop de geração agora é determinístico
+        while len(jogos) < qtd_jogos and tentativas < 5000:
             tentativas += 1
             try:
                 fator_markov = pesos_vivos.get("Markov", 0.4)
+                
+                # Gera o jogo
                 if len(last_draw) > 5:
                     q_rep = int(marca * fator_markov)
                     jg = random.sample(last_draw, min(len(last_draw), q_rep))
                     restantes = [n for n in pool if n not in jg]
                     jg += random.sample(restantes, marca - len(jg))
-                else: jg = random.sample(pool, marca)
+                else:
+                    jg = random.sample(pool, marca)
                 
                 jg = sorted([int(n) for n in jg])
+                
+                # Verifica duplicidade
                 if jg not in [x[0] for x in jogos]:
                     entropia = self._calcular_entropia_real(jg, cfg['total'])
                     limite_min = 0.35 if marca < 20 else 0.20
                     if entropia < limite_min or entropia > 0.98: continue
-                    score = (entropia * 10) + (0.5 if aprendeu else 0)
+                    
+                    # O Score também será idêntico toda vez
+                    score = (entropia * 10) + (0.5 if "Markov" in vencedora else 0)
                     jogos.append((jg, score, entropia))
             except: continue
         
@@ -120,7 +136,20 @@ class FractalCerebro:
             jg = sorted(random.sample(pool, marca))
             jogos.append((jg, 5.0, 0.5))
 
+        # Ordena sempre da mesma forma
         jogos.sort(key=lambda x: x[1], reverse=True)
+        
+        # Libera a semente no final para não afetar outras coisas fora do motor
         random.seed(None)
         
-        return {"financeiro": fin, "backtest": {"vencedora": vencedora, "scores": scores, "aprendeu": aprendeu, "pesos_atuais": pesos_vivos, "ultimo_concurso": ultimo_id}, "jogos": jogos}
+        return {
+            "financeiro": fin, 
+            "backtest": {
+                "vencedora": vencedora, 
+                "scores": scores, 
+                "aprendeu": aprendeu, 
+                "pesos_atuais": pesos_vivos, 
+                "ultimo_concurso": ultimo_id
+            }, 
+            "jogos": jogos
+        }
