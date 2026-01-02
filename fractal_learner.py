@@ -1,190 +1,65 @@
 # ==============================================================================
-# 🧠 FRACTAL MOTOR V3.5 - REBRANDING FINAL
-# ARQUIVO: fractal_motor.py
+# 🧬 FRACTAL LEARNER - MEMÓRIA REGENERATIVA
+# ARQUIVO OBRIGATÓRIO: fractal_learner.py
 # ==============================================================================
-import pandas as pd
-import numpy as np
-import random
-import google.generativeai as genai
-import warnings
-import fractal_learner
-import math
+import json
+import os
 
-warnings.filterwarnings("ignore")
-
-class FractalCerebro:
+class FractalLearner:
     def __init__(self):
-        self.versao = "FractalV 3.5"
-        self.learner = fractal_learner.FractalLearner()
+        self.arquivo_memoria = "fractal_memory.json"
         
-        self.config_base = {
-            "Lotofacil": {"total": 25, "marca_base": 15}, "Mega_Sena": {"total": 60, "marca_base": 6},
-            "Quina": {"total": 80, "marca_base": 5}, "Dia_de_Sorte": {"total": 31, "marca_base": 7},
-            "Timemania": {"total": 80, "marca_base": 10}, "Dupla_Sena": {"total": 50, "marca_base": 6},
-            "Lotomania": {"total": 100,"marca_base": 50}, "Mega_da_Virada": {"total": 60, "marca_base": 6}
+        # Pesos Padrão (O ponto de partida da IA)
+        self.pesos_padrao = {
+            "Markov": 0.40,   # 40% Inércia
+            "Fractal": 0.30,  # 30% Equilíbrio/Caos
+            "Gauss": 0.30     # 30% Estatística Normal
         }
-
-    # --- CÁLCULO DE ENTROPIA ---
-    def _calcular_entropia_real(self, jogo, total_dezenas):
-        try:
-            jogo = sorted(jogo)
-            if len(jogo) < 2: return 0.5
-            
-            gaps = np.diff(jogo)
-            std_gaps = np.std(gaps)
-            fator_espalhamento = 1.0 / (1.0 + std_gaps) 
-
-            pares = len([n for n in jogo if n % 2 == 0])
-            ratio = pares / len(jogo)
-            if ratio == 0 or ratio == 1: shannon_parity = 0
-            else:
-                shannon_parity = - (ratio * math.log2(ratio) + (1-ratio) * math.log2(1-ratio))
-
-            soma_real = sum(jogo)
-            soma_ideal = (len(jogo) * (total_dezenas + 1)) / 2
-            distancia_soma = abs(soma_real - soma_ideal)
-            fator_soma = 1.0 - (distancia_soma / soma_ideal)
-
-            entropia_final = (shannon_parity * 0.5) + ((1 - fator_espalhamento) * 0.3) + (fator_soma * 0.2)
-            return max(0.0, min(1.0, entropia_final))
-        except: return 0.5
-
-    def carregar_csv(self, url):
-        try: return pd.read_csv(url, on_bad_lines='skip')
-        except: return None
-
-    def _tratar_preco(self, valor_str):
-        try:
-            if isinstance(valor_str, (int, float)): return float(valor_str)
-            clean = str(valor_str).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
-            return float(clean)
-        except: return 0.0
-
-    def calcular_limite_jogos(self, url_precos, loteria_chave, orcamento_usuario):
-        preco_unitario = 3.00 
-        try:
-            df = self.carregar_csv(url_precos)
-            if df is not None:
-                for _, row in df.iterrows():
-                    if loteria_chave.lower() in str(row[0]).lower().replace(' ','_'):
-                        val = self._tratar_preco(row[1])
-                        if val > 0: preco_unitario = val; break
-        except: pass
-
-        qtd_jogos = int(orcamento_usuario // preco_unitario)
-        return {"qtd": max(1, qtd_jogos), "preco_unit": preco_unitario, "troco": orcamento_usuario - (qtd_jogos * preco_unitario), "custo_total": qtd_jogos * preco_unitario}
-
-    def executar_backtest(self, hist, total_dezenas):
-        if len(hist) < 5: return "Padrão Fractal", {}, False
-        scores = {"Markov": 0, "Fractal": 0, "Gauss": 0}
-        try:
-            teste = hist[-5:]
-            for i in range(len(teste)-1):
-                passado = set([int(x) for x in teste[i] if pd.notna(x)])
-                futuro = set([int(x) for x in teste[i+1] if pd.notna(x)])
-                
-                scores["Markov"] += len(passado.intersection(futuro))
-                ausentes = set(range(1, total_dezenas+1)) - passado
-                scores["Fractal"] += len(ausentes.intersection(futuro))
-                
-                meio = total_dezenas // 2
-                gauss_zone = set(range(meio-5, meio+6))
-                scores["Gauss"] += len(gauss_zone.intersection(futuro))
-        except: pass
         
-        vencedora = max(scores, key=scores.get)
-        aprendeu, quem = self.learner.regenerar_pesos(vencedora)
-        return vencedora, scores, aprendeu
+        self.memoria = self.carregar_memoria()
 
-    def analisar_com_gemini(self, api_key, modelo_escolhido, loteria, dados_fin, jogos_top3, backtest_info):
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(modelo_escolhido)
-            
-            vencedora = backtest_info.get('vencedora', 'Padrão')
-            entropia_calc = jogos_top3[0][2]
-            
-            # PROMPT ATUALIZADO COM A MARCA NOVA
-            prompt = f"""
-            Você é a IA Central do Sistema FractalV (Versão 3.5).
-            Nunca use o nome 'Oráculo'. Você é FractalV.
-            
-            Analise estes dados para a loteria {loteria}.
-            
-            PARÂMETROS FRACTAIS:
-            1. Estratégia Vencedora no Backtest: {vencedora}
-            2. Entropia Calculada: {entropia_calc:.4f}
-            3. Jogo Sugerido: {jogos_top3[0][0]}
-            
-            Responda em Português:
-            - A Entropia de {entropia_calc:.4f} indica um jogo seguro ou arriscado?
-            - Por que o algoritmo FractalV escolheu a estratégia '{vencedora}' hoje?
-            """
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e: return f"⚠️ Erro IA: {str(e)}"
-
-    def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
-        cfg = self.config_base.get(loteria_chave, self.config_base["Mega_Sena"])
-        
-        df = self.carregar_csv(url_dados)
-        hist = []
-        last_concurso_id = 0
-        if df is not None:
+    def carregar_memoria(self):
+        """Carrega a inteligência salva ou cria nova."""
+        if os.path.exists(self.arquivo_memoria):
             try:
-                cols = [c for c in df.columns if c.strip().upper().startswith('D')]
-                for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
-                df = df.dropna(subset=['Concurso']).sort_values('Concurso')
-                hist = df[cols].values
-                last_concurso_id = int(df['Concurso'].iloc[-1])
-            except: pass
+                with open(self.arquivo_memoria, 'r') as f:
+                    return json.load(f)
+            except:
+                return self.pesos_padrao
+        return self.pesos_padrao
 
-        vencedora, scores, aprendeu = self.executar_backtest(hist, cfg['total'])
-        fin = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
-        fin['orcamento_inicial'] = orcamento
-        pesos_vivos = self.learner.get_pesos()
+    def salvar_memoria(self):
+        """Grava a evolução no disco."""
+        try:
+            with open(self.arquivo_memoria, 'w') as f:
+                json.dump(self.memoria, f)
+        except: pass 
 
-        seed_val = f"FractalV3.5_{loteria_chave}_{last_concurso_id}_{vencedora}_{fin['qtd']}"
-        random.seed(seed_val) 
+    def regenerar_pesos(self, estrategia_vencedora_backtest):
+        """
+        Ajusta a inteligência baseada no sucesso recente.
+        """
+        taxa_aprendizado = 0.05 
         
-        jogos = []
-        marca = cfg['marca_base']
-        pool = list(range(1, cfg['total'] + 1))
-        last_draw = [int(x) for x in hist[-1] if pd.notna(x)] if len(hist) > 0 else []
-
-        tentativas = 0
-        while len(jogos) < fin['qtd'] and tentativas < 3000:
-            tentativas += 1
-            try:
-                fator_markov = pesos_vivos.get("Markov", 0.4)
-                
-                if len(last_draw) > 5:
-                    q_rep = int(marca * fator_markov)
-                    jg = random.sample(last_draw, min(len(last_draw), q_rep))
-                    restantes = [n for n in pool if n not in jg]
-                    jg += random.sample(restantes, marca - len(jg))
-                else:
-                    jg = random.sample(pool, marca)
-                
-                jg = sorted([int(n) for n in jg])
-                
-                if jg not in [x[0] for x in jogos]:
-                    entropia = self._calcular_entropia_real(jg, cfg['total'])
-                    if entropia < 0.35 or entropia > 0.95: continue 
-                    
-                    score = (entropia * 10) + (0.5 if aprendeu else 0)
-                    jogos.append((jg, score, entropia))
-            except: continue
+        chave_map = ""
+        if "Markov" in estrategia_vencedora_backtest: chave_map = "Markov"
+        elif "Fractal" in estrategia_vencedora_backtest: chave_map = "Fractal"
+        elif "Gauss" in estrategia_vencedora_backtest: chave_map = "Gauss"
+        
+        if chave_map:
+            self.memoria[chave_map] += taxa_aprendizado
             
-        if not jogos:
-            jg = sorted(random.sample(pool, marca))
-            jogos.append((jg, 5.0, 0.5))
+            # Reequilibra os pesos para a soma ser 1.0
+            restante = 1.0 - self.memoria[chave_map]
+            outras_chaves = [k for k in self.memoria if k != chave_map]
+            
+            for k in outras_chaves:
+                self.memoria[k] = restante / len(outras_chaves)
+            
+            self.salvar_memoria()
+            return True, chave_map
+            
+        return False, None
 
-        jogos.sort(key=lambda x: x[1], reverse=True)
-        random.seed(None) 
-        
-        return {
-            "financeiro": fin, 
-            "backtest": {"vencedora": vencedora, "scores": scores, "aprendeu": aprendeu, "pesos_atuais": pesos_vivos, "ultimo_concurso": last_concurso_id}, 
-            "jogos": jogos
-        }
+    def get_pesos(self):
+        return self.memoria
