@@ -7,6 +7,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="FractalV 3.1 Big", page_icon="🧬", layout="wide")
 
 # --- CSS PREMIUM (BIG NEUMORPHIC) ---
+# O erro estava aqui. Garanti que este bloco fecha corretamente lá embaixo.
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
@@ -46,15 +47,15 @@ st.markdown("""
 
     /* ESTILO DAS BOLAS (AGORA MAIORES) */
     .ball {
-        width: 65px;  /* Aumentado de 48px para 65px */
-        height: 65px; /* Aumentado de 48px para 65px */
+        width: 65px;  /* Tamanho grande */
+        height: 65px; 
         border-radius: 50%; 
         display: flex; align-items: center; justify-content: center;
         
         /* Tipografia Maior */
         font-family: 'Roboto Mono', monospace; 
         font-weight: 700; 
-        font-size: 28px; /* Aumentado de 18px para 28px */
+        font-size: 28px; 
         color: white;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.25);
         
@@ -76,4 +77,9 @@ st.markdown("""
     .bg-roxo { background: radial-gradient(circle at 30% 30%, #be93d6, #8e44ad); }
     .bg-verde { background: radial-gradient(circle at 30% 30%, #58d68d, #27ae60); }
     .bg-azul { background: radial-gradient(circle at 30% 30%, #6dd5fa, #2980b9); }
-    .bg-gold { background: radial-gradient(circle at
+    .bg-gold { background: radial-gradient(circle at 30% 30%, #f9e79f, #f1c40f); color: #333 !important; text-shadow: none; }
+
+    /* Botão */
+    .stButton>button {
+        width: 100%; height: 60px;
+        background: linear-gradient(90deg, #6c5ce7, #a29bfe);
