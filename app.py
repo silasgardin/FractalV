@@ -64,6 +64,23 @@ with st.sidebar:
         # Fallback apenas para não travar se você esquecer de configurar o segredo
         st.warning("⚠️ Chave não encontrada nos Secrets.")
         gemini_key = st.text_input("Cole sua chave AIza... manualmente:", type="password")
+    if gemini_key:
+        if st.button("🛠️ Testar Conexão Gemini", type="secondary"):
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=gemini_key)
+                
+                st.write("📡 Tentando listar modelos disponíveis...")
+                modelos = genai.list_models()
+                lista = [m.name for m in modelos if 'generateContent' in m.supported_generation_methods]
+                
+                if lista:
+                    st.success(f"✅ Conexão SUCESSO! Modelos disponíveis para sua chave: {lista}")
+                else:
+                    st.error("❌ Conexão feita, mas nenhum modelo encontrado. Verifique se a API Generative AI está ativada no Google Cloud.")
+            except Exception as e:
+                st.error(f"❌ Falha crítica de conexão: {e}")
+    # --- FIM DO BLOCO DE TESTE ---
 
     st.divider()
     
