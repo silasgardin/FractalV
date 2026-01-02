@@ -1,16 +1,13 @@
 import streamlit as st
 import fractal_motor 
-import fractal_connector # O novo bibliotecário
+import fractal_connector
 import google.generativeai as genai
 
-# --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="FractalV System", page_icon="🧬", layout="wide")
 
-# --- CSS PREMIUM ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
-    
     .game-card { background-color: #ffffff; padding: 30px; border-radius: 20px; border-left: 8px solid #6c5ce7; border: 1px solid #f0f2f5; box-shadow: 0 15px 35px rgba(0,0,0,0.08); margin-bottom: 25px; transition: transform 0.3s ease; }
     .game-card:hover { transform: translateY(-3px); }
     .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f5f5f5; }
@@ -19,69 +16,39 @@ st.markdown("""
     .ball-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 10px; }
     .ball { width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 24px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.25); box-shadow: inset 0px -5px 12px rgba(0,0,0,0.3), inset 0px 5px 12px rgba(255,255,255,0.25), 0px 10px 20px -5px rgba(0,0,0,0.2); border: 3px solid rgba(255,255,255,0.15); cursor: default; transition: all 0.2s; }
     .ball:hover { transform: scale(1.1); box-shadow: 0px 15px 30px -5px rgba(0,0,0,0.3); z-index: 10; }
-    
     .bg-roxo { background: radial-gradient(circle at 30% 30%, #be93d6, #8e44ad); }
     .bg-verde { background: radial-gradient(circle at 30% 30%, #58d68d, #27ae60); }
     .bg-azul { background: radial-gradient(circle at 30% 30%, #6dd5fa, #2980b9); }
     .bg-gold { background: radial-gradient(circle at 30% 30%, #f9e79f, #f1c40f); color: #333 !important; text-shadow: none; }
     .bg-laranja { background: radial-gradient(circle at 30% 30%, #fab1a0, #e17055); }
-    
     .stButton>button { width: 100%; height: 60px; background: linear-gradient(90deg, #6c5ce7, #a29bfe); color: white; font-size: 20px; font-weight: 800; border: none; border-radius: 15px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO PRINCIPAL DE INTEGRAÇÃO (CACHEADA) ---
 @st.cache_data(ttl=1800, show_spinner=False)
 def calcular_sistema_integrado(loteria_nome, orcamento):
-    # 1. Instancia o Conector (Sabe onde estão os dados)
     conector = fractal_connector.FractalConnector()
-    
-    # 2. Busca dados brutos no Oráculo V (Google Drive)
     historico, ultimo_id = conector.get_historico(loteria_nome)
     preco = conector.get_preco(loteria_nome)
-    
-    # 3. Instancia o Motor Matemático
     cerebro = fractal_motor.FractalCerebro()
-    
-    # 4. Verifica se os dados chegaram
-    if historico is None:
-        return {"erro": "Falha de conexão com a base de dados (Oráculo V). Verifique os links."}, cerebro
-        
-    # 5. Processa a matemática
-    resultado = cerebro.processar_nucleo(
-        historico, ultimo_id, preco, loteria_nome, orcamento
-    )
-    
+    if historico is None: return {"erro": "Falha no Oráculo V (Dados)"}, cerebro
+    resultado = cerebro.processar_nucleo(historico, ultimo_id, preco, loteria_nome, orcamento)
     return resultado, cerebro
 
-# --- MAPEAMENTO VISUAL ---
-CONFIG_VISUAL = {
-    "Lotofácil":    "bg-roxo",
-    "Mega Sena":    "bg-verde",
-    "Quina":        "bg-azul",
-    "Dia de Sorte": "bg-gold",
-    "Timemania":    "bg-gold",
-    "Dupla Sena":   "bg-verde",
-    "Lotomania":    "bg-laranja",
-    "Mega da Virada": "bg-verde"
-}
+CONFIG_VISUAL = {"Lotofácil": "bg-roxo", "Mega Sena": "bg-verde", "Quina": "bg-azul", "Dia de Sorte": "bg-gold", "Timemania": "bg-gold", "Dupla Sena": "bg-verde", "Lotomania": "bg-laranja", "Mega da Virada": "bg-verde"}
 
-# --- HEADER ---
 c1, c2 = st.columns([1, 6])
 with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
 with c2: 
     st.title("FractalV System")
-    st.markdown("### Arquitetura de Camadas: Conector + Motor")
+    st.markdown("### Arquitetura V4.0: Conector + Motor")
 
-# --- SIDEBAR ---
 with st.sidebar:
     st.header("🧬 Parâmetros")
-    
     if "GEMINI_KEY" in st.secrets:
         gemini_key = st.secrets["GEMINI_KEY"]
         st.success("🔐 Chave Autenticada")
-    else:
-        gemini_key = st.text_input("API Key (Gemini):", type="password")
+    else: gemini_key = st.text_input("API Key (Gemini):", type="password")
     
     modelo_selecionado = "gemini-pro"
     if gemini_key:
@@ -89,86 +56,42 @@ with st.sidebar:
             genai.configure(api_key=gemini_key)
             raw_models = genai.list_models()
             modelos_uteis = [m.name for m in raw_models if 'generateContent' in m.supported_generation_methods and 'gemini' in m.name]
-            st.divider()
-            st.markdown("🤖 **Cérebro IA**")
-            modelo_selecionado = st.selectbox("Versão:", modelos_uteis, index=0)
+            st.divider(); st.markdown("🤖 **Cérebro IA**"); modelo_selecionado = st.selectbox("Versão:", modelos_uteis, index=0)
         except: pass
 
     st.divider()
     loteria = st.selectbox("Modalidade:", list(CONFIG_VISUAL.keys()))
     orcamento = st.number_input("Capital (R$):", min_value=1.0, value=50.0, step=1.0)
-    
-    if st.button("🔄 Forçar Recálculo"):
-        st.cache_data.clear()
-        st.rerun()
+    if st.button("🔄 Forçar Recálculo"): st.cache_data.clear(); st.rerun()
 
-# --- CORE ---
 if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
     with st.spinner(f"📡 A contactar camada de dados (Oráculo V)..."):
         try:
-            # Chama a função integrada
             res, cerebro_ativo = calcular_sistema_integrado(loteria, orcamento)
-            
-            if "erro" in res:
-                st.error(f"🚨 {res['erro']}")
+            if "erro" in res: st.error(f"🚨 {res['erro']}")
             else:
-                fin = res['financeiro']
-                jogos = res['jogos']
-                meta = res['backtest']
-                
+                fin = res['financeiro']; jogos = res['jogos']; meta = res['backtest']
                 st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta.get('ultimo_concurso', 'N/A')}.")
-
-                # PAINEL FINANCEIRO
+                
                 st.markdown("### 📊 Gestão de Banca")
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Jogos Gerados", f"{fin['qtd']}")
-                col2.metric("Custo Total", f"R$ {fin['custo_total']:.2f}")
-                col3.metric("Troco", f"R$ {fin['troco']:.2f}")
-                
+                col1.metric("Jogos", f"{fin['qtd']}"); col2.metric("Custo", f"R$ {fin['custo_total']:.2f}"); col3.metric("Troco", f"R$ {fin['troco']:.2f}")
                 st.divider()
-
-                # PAINEL DE INTELIGÊNCIA
+                
                 st.markdown("### 🧠 Plasticidade Neural")
-                cols = st.columns(3)
-                pesos = meta['pesos_atuais']
-                cols[0].metric("Markov", f"{pesos['Markov']*100:.0f}%")
-                cols[1].metric("Fractal", f"{pesos['Fractal']*100:.0f}%")
-                cols[2].metric("Gauss", f"{pesos['Gauss']*100:.0f}%")
+                cols = st.columns(3); pesos = meta['pesos_atuais']
+                cols[0].metric("Markov", f"{pesos['Markov']*100:.0f}%"); cols[1].metric("Fractal", f"{pesos['Fractal']*100:.0f}%"); cols[2].metric("Gauss", f"{pesos['Gauss']*100:.0f}%")
                 st.progress(max(pesos.values()))
-
+                
                 if gemini_key:
                     with st.chat_message("assistant", avatar="🧬"):
                         st.markdown(f"**Análise ({modelo_selecionado}):**")
-                        analise = cerebro_ativo.analisar_com_gemini(
-                            gemini_key, modelo_selecionado, loteria, fin, jogos[:3], meta
-                        )
-                        st.write(analise)
-
-                st.divider()
-                st.subheader(f"Sequências Otimizadas ({len(jogos)})")
+                        st.write(cerebro_ativo.analisar_com_gemini(gemini_key, modelo_selecionado, loteria, fin, jogos[:3], meta))
                 
+                st.divider(); st.subheader(f"Sequências Otimizadas ({len(jogos)})")
                 css_class = CONFIG_VISUAL.get(loteria, "bg-azul")
-                
                 for i, (jg, score, entropia) in enumerate(jogos):
-                    bolas_html = ""
-                    for num in jg:
-                        bolas_html += f'<div class="ball {css_class}">{int(num):02d}</div>'
-                    
-                    cor_entr = "#e74c3c"
-                    if 0.4 <= entropia <= 0.8: cor_entr = "#2ecc71"
-                    elif entropia > 0.8: cor_entr = "#f1c40f"
-
-                    st.markdown(f"""
-                    <div class="game-card">
-                        <div class="card-header">
-                            <span class="game-title">JOGO #{i+1:02d}</span>
-                            <div style="text-align: right;">
-                                <span class="game-score">SCORE: {score:.2f}</span><br>
-                                <small style="color:#666; font-size:11px;">ENTROPIA: <b style="color:{cor_entr}">{entropia:.4f}</b></small>
-                            </div>
-                        </div>
-                        <div class="ball-container">{bolas_html}</div>
-                    </div>""", unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error(f"Erro Crítico no App: {e}")
+                    bolas_html = "".join([f'<div class="ball {css_class}">{int(num):02d}</div>' for num in jg])
+                    cor_entr = "#2ecc71" if 0.4 <= entropia <= 0.8 else ("#f1c40f" if entropia > 0.8 else "#e74c3c")
+                    st.markdown(f"""<div class="game-card"><div class="card-header"><span class="game-title">JOGO #{i+1:02d}</span><div style="text-align: right;"><span class="game-score">SCORE: {score:.2f}</span><br><small style="color:#666; font-size:11px;">ENTROPIA: <b style="color:{cor_entr}">{entropia:.4f}</b></small></div></div><div class="ball-container">{bolas_html}</div></div>""", unsafe_allow_html=True)
+        except Exception as e: st.error(f"Erro Crítico no App: {e}")
