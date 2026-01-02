@@ -1,201 +1,128 @@
-# ==============================================================================
-# 🧠 ORÁCULO MOTOR V41 - INTEGER SAFE MODE
-# (Garante que todos os números sejam inteiros para evitar erros visuais)
-# ==============================================================================
+import streamlit as st
+import oraculo_motor
+import meus_links 
 
-import pandas as pd
-import numpy as np
-import random
-import google.generativeai as genai
-import warnings
+# --- CONFIGURAÇÃO VISUAL ---
+st.set_page_config(page_title="Oráculo V41", page_icon="🔮", layout="wide")
 
-warnings.filterwarnings("ignore")
+st.markdown("""
+<style>
+    .game-card {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        border-left: 6px solid #4285F4;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        margin-bottom: 15px;
+    }
+    .lottery-numbers {
+        font-family: 'Courier New', monospace;
+        font-size: 24px;
+        font-weight: bold;
+        color: #2c3e50;
+        letter-spacing: 2px;
+        text-align: center;
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+    .game-score {
+        font-size: 14px;
+        color: #27ae60;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    .stButton>button {
+        width: 100%;
+        background-color: #4285F4;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        padding: 10px;
+        border-radius: 8px;
+        border: none;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-class OraculoCerebro:
-    def __init__(self):
-        self.versao = "V41 (Int Safe)"
-        
-        self.config_base = {
-            "Lotofacil":      {"total": 25, "marca_base": 15},
-            "Mega_Sena":      {"total": 60, "marca_base": 6},
-            "Quina":          {"total": 80, "marca_base": 5},
-            "Dia_de_Sorte":   {"total": 31, "marca_base": 7},
-            "Timemania":      {"total": 80, "marca_base": 10},
-            "Dupla_Sena":     {"total": 50, "marca_base": 6},
-            "Lotomania":      {"total": 100,"marca_base": 50},
-            "Mega_da_Virada": {"total": 60, "marca_base": 6}
-        }
-        
-        self.tabela_precos_default = {
-            "Mega_Sena": 6.00, "Mega_da_Virada": 6.00, "Lotofacil": 3.50,
-            "Quina": 3.00, "Dia_de_Sorte": 2.50, "Timemania": 3.50, 
-            "Lotomania": 3.00, "Dupla_Sena": 3.00
-        }
+st.title("🔮 Oráculo V41 - Adaptive Backtest")
 
-    def carregar_csv(self, url):
-        try: return pd.read_csv(url)
-        except: return None
+try:
+    LINK_TABELA_PRECOS = meus_links.LINK_PRECOS
+    SHEETS_URLS = meus_links.URLS
+    SHEETS = {
+        "Lotofácil": {"url": SHEETS_URLS["Lotofácil"], "desc": "Repetição 9/6"},
+        "Mega Sena": {"url": SHEETS_URLS["Mega Sena"], "desc": "Equilíbrio Par/Ímpar"},
+        "Quina": {"url": SHEETS_URLS["Quina"], "desc": "Cadeias de Markov"},
+        "Dia de Sorte": {"url": SHEETS_URLS["Dia de Sorte"], "desc": "Soma Gaussiana"},
+        "Timemania": {"url": SHEETS_URLS["Timemania"], "desc": "Colunas"},
+        "Dupla Sena": {"url": SHEETS_URLS["Dupla Sena"], "desc": "Dupla Chance"},
+        "Lotomania": {"url": SHEETS_URLS["Lotomania"], "desc": "Espelhamento"},
+        "Mega da Virada": {"url": SHEETS_URLS["Mega da Virada"], "desc": "Sazonal"}
+    }
+except:
+    st.error("🚨 Erro: Verifique `meus_links.py`.")
+    st.stop()
 
-    def _tratar_preco(self, valor_str):
+with st.sidebar:
+    st.header("⚙️ Configuração")
+    
+    gemini_key = None
+    if "GEMINI_KEY" in st.secrets:
+        gemini_key = st.secrets["GEMINI_KEY"]
+        st.success("🔐 Chave Autenticada")
+    else:
+        gemini_key = st.text_input("API Key:", type="password")
+
+    st.divider()
+    loteria = st.selectbox("Modalidade:", list(SHEETS.keys()))
+    orcamento = st.number_input("💰 Orçamento (R$):", min_value=1.0, value=50.0, step=1.0)
+
+if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
+    with st.spinner("📡 A rodar Backtest..."):
         try:
-            if isinstance(valor_str, (int, float)): return float(valor_str)
-            clean = str(valor_str).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
-            return float(clean)
-        except: return 0.0
-
-    def calcular_limite_jogos(self, url_precos, loteria_chave, orcamento_usuario):
-        df = self.carregar_csv(url_precos)
-        preco_unitario = 0.0
-        
-        if df is not None:
-            for _, row in df.iterrows():
-                nome_csv = str(row[0]).lower().replace('á','a').replace('ã','a').replace(' ','_')
-                if loteria_chave.lower() in nome_csv:
-                    preco_unitario = self._tratar_preco(row[1])
-                    break
-        
-        if preco_unitario <= 0:
-            for k, v in self.tabela_precos_default.items():
-                if loteria_chave.lower() in k.lower():
-                    preco_unitario = v; break
-            if preco_unitario <= 0: preco_unitario = 3.00
+            cerebro = oraculo_motor.OraculoCerebro()
+            chave_norm = loteria.replace("á","a").replace("ç","c").replace(" ","_")
             
-        qtd_jogos = int(orcamento_usuario // preco_unitario)
-        troco = orcamento_usuario - (qtd_jogos * preco_unitario)
-        
-        return {
-            "qtd": qtd_jogos if qtd_jogos > 0 else 1,
-            "preco_unit": preco_unitario,
-            "troco": troco,
-            "custo_total": qtd_jogos * preco_unitario
-        }
-
-    def executar_backtest(self, hist, total_dezenas):
-        if len(hist) < 15: 
-            return "Padrão Aleatório", {}
-
-        scores = {"Markov (Inércia)": 0, "Fractal (Equilíbrio)": 0, "Gauss (Soma)": 0}
-        teste = hist[-10:]
-        
-        for i in range(len(teste)-1):
-            passado = set([int(x) for x in teste[i] if not pd.isna(x)])
-            futuro = set([int(x) for x in teste[i+1] if not pd.isna(x)])
-            passado_list = list(passado)
+            res = cerebro.gerar_palpite_cloud(
+                SHEETS[loteria]['url'], LINK_TABELA_PRECOS, chave_norm, orcamento
+            )
             
-            # Markov
-            p_mk = set(passado_list[:len(passado_list)//2]) 
-            scores["Markov (Inércia)"] += len(p_mk.intersection(futuro))
-            
-            # Fractal
-            todos = set(range(1, total_dezenas+1))
-            ausentes = list(todos - passado)
-            random.shuffle(ausentes)
-            p_fr = set(ausentes[:len(passado_list)//2])
-            scores["Fractal (Equilíbrio)"] += len(p_fr.intersection(futuro))
-            
-            # Gauss
-            meio = total_dezenas // 2
-            p_gs = set(range(meio-5, meio+6))
-            scores["Gauss (Soma)"] += len(p_gs.intersection(futuro))
+            if "erro" in res:
+                st.error(f"❌ {res['erro']}")
+            else:
+                fin = res['financeiro']
+                jogos = res['jogos']
+                
+                st.markdown("### 📊 Resultado do Backtest")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Estratégia Vencedora", res['backtest']['vencedora'])
+                c2.metric("Jogos", fin['qtd'])
+                c3.metric("Troco", f"R$ {fin['troco']:.2f}")
+                
+                if gemini_key:
+                    with st.chat_message("assistant", avatar="🤖"):
+                        analise = cerebro.analisar_com_gemini(
+                            gemini_key, loteria, fin, jogos[:3], res['backtest']
+                        )
+                        st.write(analise)
 
-        melhor = max(scores, key=scores.get)
-        return melhor, scores
+                st.divider()
+                st.subheader(f"🎲 Palpites ({len(jogos)} jogos)")
+                
+                for i, (jg, score) in enumerate(jogos):
+                    # --- CORREÇÃO DEFINITIVA DO ERRO 'FLOAT' ---
+                    # Convertemos cada número 'n' para int() antes de formatar
+                    nums_fmt = " - ".join([f"{int(n):02d}" for n in jg])
+                    
+                    st.markdown(f"""
+                    <div class="game-card">
+                        <div class="game-score">JOGO {i+1:02d} (Score: {score:.2f})</div>
+                        <div class="lottery-numbers">{nums_fmt}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-    def analisar_com_gemini(self, api_key, loteria, dados_fin, jogos_top3, backtest_info):
-        try:
-            genai.configure(api_key=api_key)
-            modelo = "gemini-pro"
-            try:
-                ms = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                for m in ms: 
-                    if 'flash' in m: modelo = m; break
-                else:
-                    if ms: modelo = ms[0]
-            except: pass
-
-            model = genai.GenerativeModel(modelo)
-            vencedora = backtest_info.get('vencedora', 'Padrão')
-            jogos_txt = "\n".join([f"- Jogo: {j[0]}" for j in jogos_top3])
-            
-            prompt = f"""
-            Analise estes jogos de loteria ({loteria}) do Oráculo V41.
-            Contexto:
-            - Orçamento: R$ {dados_fin['orcamento_inicial']:.2f} ({dados_fin['qtd']} jogos)
-            - Estratégia Vencedora no Backtest: {vencedora}
-            Jogos:
-            {jogos_txt}
-            Responda em Português (curto):
-            1. Por que a estratégia '{vencedora}' foi escolhida?
-            2. Analise os números do primeiro jogo.
-            3. Comente a eficiência do orçamento.
-            """
-            response = model.generate_content(prompt)
-            return response.text
         except Exception as e:
-            return f"⚠️ Erro IA: {str(e)}"
-
-    def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
-        cfg = self.config_base.get(loteria_chave)
-        if not cfg: cfg = self.config_base["Mega_Sena"]
-        
-        df = self.carregar_csv(url_dados)
-        hist = []
-        if df is not None:
-            cols = [c for c in df.columns if c.strip().upper().startswith('D')]
-            for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
-            df = df.dropna(subset=['Concurso']).sort_values('Concurso')
-            hist = df[cols].values
-        
-        vencedora, scores = self.executar_backtest(hist, cfg['total'])
-        fin = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
-        fin['orcamento_inicial'] = orcamento
-        
-        if fin['qtd'] < 1: 
-            return {"erro": f"Orçamento insuficiente. Mínimo: R$ {fin['preco_unit']:.2f}"}
-
-        jogos = []
-        marca = cfg['marca_base']
-        pool = list(range(1, cfg['total'] + 1))
-        last = hist[-1] if len(hist) > 0 else []
-        
-        # Converte last para inteiros limpos
-        last_int = [int(x) for x in last if not pd.isna(x)]
-
-        peso_rep = 0.5
-        if "Markov" in vencedora: peso_rep = 0.8
-        if "Fractal" in vencedora: peso_rep = 0.2
-        
-        tentativas = 0
-        while len(jogos) < fin['qtd'] and tentativas < 5000:
-            tentativas += 1
-            try:
-                q_rep = int(marca * peso_rep)
-                cand_rep = [n for n in last_int if n in pool]
-                cand_new = [n for n in pool if n not in last_int]
-                
-                if len(cand_rep) < q_rep: q_rep = len(cand_rep)
-                
-                base = random.sample(cand_rep, q_rep) + random.sample(cand_new, marca - q_rep)
-                jg = sorted(list(set(base)))
-                
-                while len(jg) < marca: 
-                    n = random.choice(pool)
-                    if n not in jg: jg.append(n)
-                jg = sorted(jg)
-                
-                # --- CORREÇÃO FINAL: GARANTE QUE SÃO INTEIROS ---
-                jg_final = [int(num) for num in jg]
-                # ------------------------------------------------
-
-                if jg_final not in [x[0] for x in jogos]:
-                    score = random.uniform(8.0, 9.9) 
-                    jogos.append((jg_final, score))
-            except: continue
-        
-        jogos.sort(key=lambda x: x[1], reverse=True)
-        
-        return {
-            "financeiro": fin,
-            "backtest": {"vencedora": vencedora, "scores": scores},
-            "jogos": jogos
-        }
+            st.error(f"Erro crítico: {e}")
