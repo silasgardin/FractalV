@@ -1,11 +1,9 @@
 import streamlit as st
 import oraculo_motor
-import meus_links  # Importa os links do arquivo externo
+import meus_links 
 
-# --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="Oráculo V40 Pro", page_icon="🔮", layout="wide")
 
-# --- CSS PERSONALIZADO (Cartões e Números Grandes) ---
 st.markdown("""
 <style>
     .game-card {
@@ -49,33 +47,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🔮 Oráculo V40 - Adaptive Backtest")
-st.markdown("### Inteligência que testa antes de jogar")
 
-# ==============================================================================
-# 1. CARREGAMENTO DOS LINKS
-# ==============================================================================
 try:
     LINK_TABELA_PRECOS = meus_links.LINK_PRECOS
     SHEETS_URLS = meus_links.URLS
     SHEETS = {
-        "Lotofácil":    {"url": SHEETS_URLS["Lotofácil"],    "desc": "Repetição 9/6"},
-        "Mega Sena":    {"url": SHEETS_URLS["Mega Sena"],    "desc": "Equilíbrio Par/Ímpar"},
-        "Quina":        {"url": SHEETS_URLS["Quina"],        "desc": "Cadeias de Markov"},
+        "Lotofácil": {"url": SHEETS_URLS["Lotofácil"], "desc": "Repetição 9/6"},
+        "Mega Sena": {"url": SHEETS_URLS["Mega Sena"], "desc": "Equilíbrio Par/Ímpar"},
+        "Quina": {"url": SHEETS_URLS["Quina"], "desc": "Cadeias de Markov"},
         "Dia de Sorte": {"url": SHEETS_URLS["Dia de Sorte"], "desc": "Soma Gaussiana"},
-        "Timemania":    {"url": SHEETS_URLS["Timemania"],    "desc": "Colunas"},
-        "Dupla Sena":   {"url": SHEETS_URLS["Dupla Sena"],   "desc": "Dupla Chance"},
-        "Lotomania":    {"url": SHEETS_URLS["Lotomania"],    "desc": "Espelhamento"},
+        "Timemania": {"url": SHEETS_URLS["Timemania"], "desc": "Colunas"},
+        "Dupla Sena": {"url": SHEETS_URLS["Dupla Sena"], "desc": "Dupla Chance"},
+        "Lotomania": {"url": SHEETS_URLS["Lotomania"], "desc": "Espelhamento"},
         "Mega da Virada": {"url": SHEETS_URLS["Mega da Virada"], "desc": "Sazonal"}
     }
 except:
-    st.error("🚨 Erro: Verifique o arquivo `meus_links.py`.")
+    st.error("🚨 Erro: Verifique `meus_links.py`.")
     st.stop()
 
-# ==============================================================================
-# 2. BARRA LATERAL
-# ==============================================================================
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/8/8a/Google_Gemini_logo.svg", width=140)
     st.header("⚙️ Configuração")
     
     gemini_key = None
@@ -84,32 +74,13 @@ with st.sidebar:
         st.success("🔐 Chave Autenticada")
     else:
         gemini_key = st.text_input("API Key:", type="password")
-    
-    # Teste de Conexão Rápido
-    if st.button("🛠️ Testar Conexão IA"):
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=gemini_key)
-            mods = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            if mods: st.success("✅ Conectado!")
-            else: st.warning("⚠️ Sem modelos.")
-        except Exception as e: st.error(f"❌ Erro: {e}")
 
     st.divider()
     loteria = st.selectbox("Modalidade:", list(SHEETS.keys()))
     orcamento = st.number_input("💰 Orçamento (R$):", min_value=1.0, value=50.0, step=1.0)
-    st.caption("v40.0 (Backtest Edition)")
 
-# ==============================================================================
-# 3. EXECUÇÃO
-# ==============================================================================
 if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
-    
-    if "COLE_" in LINK_TABELA_PRECOS:
-        st.error("Configure os links no arquivo `meus_links.py`!")
-        st.stop()
-
-    with st.spinner(f"📡 V40 a rodar Backtest nos últimos concursos de {loteria}..."):
+    with st.spinner("📡 A rodar Backtest..."):
         try:
             cerebro = oraculo_motor.OraculoCerebro()
             chave_norm = loteria.replace("á","a").replace("ç","c").replace(" ","_")
@@ -124,27 +95,20 @@ if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
                 fin = res['financeiro']
                 jogos = res['jogos']
                 
-                # --- PAINEL FINANCEIRO ---
-                st.markdown("### 📊 Resultado do Backtest & Orçamento")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Estratégia Vencedora", res['backtest']['vencedora'])
-                col2.metric("Jogos Possíveis", fin['qtd'])
-                col3.metric("Custo Total", f"R$ {fin['custo_total']:.2f}")
-                col4.metric("Troco", f"R$ {fin['troco']:.2f}")
+                st.markdown("### 📊 Resultado do Backtest")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Estratégia Vencedora", res['backtest']['vencedora'])
+                c2.metric("Jogos", fin['qtd'])
+                c3.metric("Troco", f"R$ {fin['troco']:.2f}")
                 
-                # --- ANÁLISE DE I.A. (INTEGRAÇÃO V40) ---
                 if gemini_key:
                     with st.chat_message("assistant", avatar="🤖"):
-                        st.markdown(f"**🧠 Análise V40 (Baseada no Backtest):**")
                         analise = cerebro.analisar_com_gemini(
                             gemini_key, loteria, fin, jogos[:3], res['backtest']
                         )
                         st.write(analise)
 
-                # --- LISTA DE JOGOS (DESIGN PRO) ---
                 st.divider()
-                st.subheader(f"🎲 Seus Palpites Otimizados ({len(jogos)} Jogos)")
-                
                 for i, (jg, score) in enumerate(jogos):
                     nums_fmt = " - ".join([f"{n:02d}" for n in jg])
                     st.markdown(f"""
