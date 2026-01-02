@@ -1,6 +1,5 @@
 # ==============================================================================
-# 🧠 ORÁCULO MOTOR V36 - AUTO-DISCOVERY AI
-# (Detecta automaticamente qual modelo Gemini está disponível)
+# 🧠 ORÁCULO MOTOR V36 - AUTO-DISCOVERY (BLINDADO)
 # ==============================================================================
 
 import pandas as pd
@@ -14,8 +13,9 @@ warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V36 (Auto-Discovery AI)"
+        self.versao = "V36 (Auto-Discovery Blindado)"
         
+        # Configurações de Jogo
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca_base": 15},
             "Mega_Sena":      {"total": 60, "marca_base": 6},
@@ -146,42 +146,50 @@ class OraculoCerebro:
         custo = tabela[melhor]
         return {"tipo": "Combo" if melhor > base else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
 
-    # --- INTEGRAÇÃO INTELIGENTE (AUTO-DISCOVERY) ---
+    # --- ANÁLISE DE I.A. (AUTO-DISCOVERY / BUSCA AUTOMÁTICA) ---
     def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
         try:
             genai.configure(api_key=api_key)
             
-            # --- AUTO-DISCOVERY: Busca qual modelo funciona ---
-            modelo_escolhido = 'gemini-pro' # Padrão
-            
+            # 1. Pergunta à API quais modelos estão disponíveis
+            modelos_disponiveis = []
             try:
-                # Pergunta para a API quais modelos estão disponíveis
-                lista_modelos = []
                 for m in genai.list_models():
                     if 'generateContent' in m.supported_generation_methods:
-                        lista_modelos.append(m.name)
-                
-                # Tenta achar um 'flash' primeiro (mais rápido)
-                for m in lista_modelos:
-                    if 'flash' in m:
+                        modelos_disponiveis.append(m.name)
+            except Exception as e_list:
+                return f"⚠️ Erro ao listar modelos: {str(e_list)}. Verifique sua API Key."
+
+            if not modelos_disponiveis:
+                return "⚠️ Nenhum modelo Gemini encontrado na sua conta."
+
+            # 2. Escolhe o melhor modelo (Prioridade: Flash > Pro > Qualquer outro)
+            modelo_escolhido = None
+            
+            # Tenta achar 'flash' (rápido e moderno)
+            for m in modelos_disponiveis:
+                if 'flash' in m.lower():
+                    modelo_escolhido = m
+                    break
+            
+            # Se não, tenta 'pro' (estável)
+            if not modelo_escolhido:
+                for m in modelos_disponiveis:
+                    if 'pro' in m.lower():
                         modelo_escolhido = m
                         break
-                else:
-                    # Se não tiver flash, pega o primeiro que tiver 'gemini'
-                    for m in lista_modelos:
-                        if 'gemini' in m:
-                            modelo_escolhido = m
-                            break
-            except:
-                pass # Se der erro na listagem, usa o padrão 'gemini-pro'
+            
+            # Se não, pega o primeiro que aparecer (ex: 'gemini-1.0-pro')
+            if not modelo_escolhido:
+                modelo_escolhido = modelos_disponiveis[0]
 
-            # Cria o modelo com o nome descoberto
+            # 3. Executa com o modelo descoberto
             model = genai.GenerativeModel(modelo_escolhido)
             
             jogos_texto = "\n".join([f"- Jogo: {j[0]} (Score Mat: {j[1]:.2f})" for j in jogos_top3])
             
             prompt = f"""
-            Aja como um Matemático Especialista em Loterias.
+            Você é o 'Oráculo', um matemático especialista em loterias.
             Analise os dados gerados pelo meu algoritmo para a {loteria}:
             
             1. Estratégia Financeira: {estrategia_fin['estrategia']}
@@ -189,16 +197,16 @@ class OraculoCerebro:
             {jogos_texto}
             
             Responda em Português (máx 3 linhas):
-            - Por que esta estratégia é eficiente?
+            - Por que esta estratégia financeira é eficiente?
             - Cite uma curiosidade estatística sobre os números do primeiro jogo.
-            (Modelo usado: {modelo_escolhido})
+            (Assinado: Oráculo V36 usando {modelo_escolhido})
             """
             
             response = model.generate_content(prompt)
             return response.text
         
         except Exception as e:
-            return f"⚠️ Nota: IA indisponível ({str(e)}). Os jogos matemáticos acima estão corretos."
+            return f"⚠️ Erro na IA ({str(e)}). Mas os jogos matemáticos acima estão corretos!"
 
     # --- GERAÇÃO CLOUD ---
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
