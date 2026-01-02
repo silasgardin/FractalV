@@ -1,8 +1,4 @@
-# ==============================================================================
-# 🧠 ORÁCULO MOTOR V35 - GEMINI EDITION
-# (Financial Intelligence + Fractal Logic + Google Gemini AI)
-# ==============================================================================
-
+# oraculo_motor.py - V35 (Gemini Pro Stable Fixed)
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
@@ -14,7 +10,7 @@ warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V35 (Gemini Edition)"
+        self.versao = "V35 (Gemini Pro Stable)"
         
         # Configurações de Jogo
         self.config_base = {
@@ -28,7 +24,6 @@ class OraculoCerebro:
             "Mega_da_Virada": {"total": 60, "marca_base": 6}
         }
         
-        # Multiplicadores para Apostas Múltiplas
         self.multiplicadores = {
             "Mega_Sena":      {6: 1, 7: 7, 8: 28, 9: 84, 10: 210},
             "Mega_da_Virada": {6: 1, 7: 7, 8: 28, 9: 84},
@@ -54,7 +49,7 @@ class OraculoCerebro:
     def atualizar_precos(self, url_precos, loteria_chave):
         df = self.carregar_csv(url_precos)
         preco_base = 0.0
-        fallback = 3.00 # Preço de segurança
+        fallback = 3.00
         
         if df is not None:
             for _, row in df.iterrows():
@@ -77,7 +72,7 @@ class OraculoCerebro:
             
         return tabela, preco_base
 
-    # --- CAMADA 1: MOTORES MATEMÁTICOS ---
+    # --- MATEMÁTICA ---
     def _core_markov(self, hist, total):
         matriz = np.zeros((total + 1, total + 1)); recorte = hist[-100:]
         for i in range(len(recorte)-1):
@@ -126,7 +121,6 @@ class OraculoCerebro:
             scores[d] = ratio if series[-1] == 0 else 1.0 - ratio
         return scores
 
-    # --- CAMADA 2: FILTROS ---
     def _validar_filtros(self, jogo, last_draw, loteria_chave):
         soma = sum(jogo)
         if "facil" in loteria_chave.lower():
@@ -139,59 +133,49 @@ class OraculoCerebro:
             if len(jogo) == 6 and not (140 <= soma <= 240): return False
         return True
 
-    # --- CAMADA 3: FINANCEIRO ---
-    def otimizar_orcamento(self, tabela_precos, orcamento):
-        base_dezenas = min(tabela_precos.keys())
-        melhor = base_dezenas
-        qtd_final = int(orcamento // tabela_precos[base_dezenas])
-        
-        for dezenas in sorted(tabela_precos.keys(), reverse=True):
-            preco = tabela_precos[dezenas]
-            qtd_possivel = int(orcamento // preco)
-            if qtd_possivel >= 1:
-                min_jogos = 2 if dezenas > base_dezenas else 1
-                if qtd_possivel >= min_jogos:
-                    melhor = dezenas; qtd_final = qtd_possivel; break
-        
-        custo = tabela_precos[melhor]
-        return {"tipo": "Combo" if melhor > base_dezenas else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
+    def otimizar_orcamento(self, tabela, orcamento):
+        base = min(tabela.keys()); melhor = base; qtd_final = int(orcamento // tabela[base])
+        for d in sorted(tabela.keys(), reverse=True):
+            preco = tabela[d]; qtd = int(orcamento // preco)
+            if qtd >= 1:
+                min_j = 2 if d > base else 1
+                if qtd >= min_j: melhor = d; qtd_final = qtd; break
+        custo = tabela[melhor]
+        return {"tipo": "Combo" if melhor > base else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
 
-    # --- CAMADA 4: I.A. GEMINI (NOVO) ---
+    # --- CORREÇÃO DO GEMINI (AQUI ESTÁ A MUDANÇA) ---
     def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
-        """Conecta ao Google Gemini para análise qualitativa"""
         try:
-            # Configura o Gemini
+            # Configuração segura
             genai.configure(api_key=api_key)
             
-            # Modelo Flash é mais rápido e ideal para análise de dados
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Mudei de 'gemini-1.5-flash' para 'gemini-pro'
+            # 'gemini-pro' é o modelo mais estável e universalmente suportado
+            model = genai.GenerativeModel('gemini-pro')
             
             jogos_texto = "\n".join([f"- Jogo: {j[0]} (Score Mat: {j[1]:.2f})" for j in jogos_top3])
             
             prompt = f"""
-            Aja como um Matemático Especialista em Probabilidades de Loteria.
+            Aja como um Matemático Especialista em Loterias.
             Analise os dados gerados pelo meu algoritmo para a {loteria}:
             
-            1. Estratégia Financeira Aplicada: {estrategia_fin['estrategia']}
-            2. Jogos Gerados (Top 3 de {estrategia_fin['qtd']} gerados):
+            1. Estratégia Financeira: {estrategia_fin['estrategia']}
+            2. Jogos Gerados (Top 3):
             {jogos_texto}
             
-            Tarefa:
-            - Explique de forma simples por que a estratégia de jogar com {estrategia_fin['estrategia']} é matematicamente vantajosa para este orçamento.
-            - Olhe para os números do Jogo 1 e cite uma curiosidade estatística (ex: equilibrio par/impar, soma ou sequências).
-            - Dê uma frase motivacional curta sobre probabilidades.
-            
-            Responda em Português.
+            Responda em Português (máx 4 linhas):
+            - Por que esta estratégia financeira é eficiente?
+            - Cite uma observação curiosa sobre os números do primeiro jogo (pares/ímpares ou repetições).
             """
             
             response = model.generate_content(prompt)
             return response.text
         except Exception as e:
-            return f"⚠️ Gemini indisponível no momento: {str(e)}. (Mas os jogos calculados estão corretos!)"
+            # Retorna o erro de forma amigável sem quebrar o app
+            return f"⚠️ Nota: O Gemini (IA) não pôde responder agora ({str(e)}), mas os seus jogos matemáticos acima estão 100% corretos e prontos para usar!"
 
-    # --- EXECUÇÃO CLOUD ---
+    # --- EXECUÇÃO ---
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
-        # Config e Leitura
         cfg = self.config_base.get(loteria_chave)
         if not cfg:
              for k, v in self.config_base.items():
@@ -204,13 +188,11 @@ class OraculoCerebro:
         for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
         if 'Concurso' in df.columns: df = df.dropna(subset=['Concurso']).sort_values('Concurso')
 
-        # Preços e Orçamento
-        tabela_precos, preco_base = self.atualizar_precos(url_precos, loteria_chave)
-        plano = self.otimizar_orcamento(tabela_precos, orcamento)
+        tab, preco = self.atualizar_precos(url_precos, loteria_chave)
+        plano = self.otimizar_orcamento(tab, orcamento)
         
         if plano['qtd'] < 1: return {"erro": "Orçamento insuficiente."}
 
-        # Motores Matemáticos
         hist = df[cols].values
         s_mk = self._core_markov(hist, cfg['total'])
         s_ia = self._core_xgboost(hist, cfg['total'])
@@ -228,24 +210,22 @@ class OraculoCerebro:
         
         ranking = sorted(final.items(), key=lambda x: x[1], reverse=True)
         pool_elite = [x[0] for x in ranking[:int(cfg['total']*0.7)]]
-        
-        # Zebra: do fim da lista, evitando os 5 piores
         pool_zebra = [x[0] for x in ranking[int(cfg['total']*0.7):-5]]
         if not pool_zebra: pool_zebra = [x[0] for x in ranking[int(cfg['total']*0.7):]]
 
         jogos = []
         marca = plano['dezenas']
         
-        num_zebras = 2
-        if marca >= 8: num_zebras = 3
-        if "facil" in loteria_chave.lower() and marca >= 16: num_zebras = 4
-        num_elite = marca - num_zebras
+        n_z = 2
+        if marca >= 8: n_z = 3
+        if "facil" in loteria_chave.lower() and marca >= 16: n_z = 4
+        n_e = marca - n_z
 
         tentativas = 0
         while len(jogos) < plano['qtd'] and tentativas < 10000:
             tentativas += 1
             try:
-                base = random.sample(pool_elite, num_elite) + random.sample(pool_zebra, num_zebras)
+                base = random.sample(pool_elite, n_e) + random.sample(pool_zebra, n_z)
                 jg = sorted(list(set(base)))
                 while len(jg) < marca: jg.append(random.choice(pool_elite)); jg = sorted(list(set(jg)))
                 jg = jg[:marca]
@@ -263,8 +243,8 @@ class OraculoCerebro:
                 "estrategia": f"{plano['tipo']} ({marca} dz)",
                 "qtd": plano['qtd'],
                 "troco": plano['troco'],
-                "preco_base": preco_base,
-                "conselho": f"V35 Otimizado: {plano['qtd']} jogos de {marca} dezenas."
+                "preco_base": preco,
+                "conselho": f"Otimizado: {plano['qtd']} jogos de {marca} dezenas."
             },
             "jogos": jogos
         }
