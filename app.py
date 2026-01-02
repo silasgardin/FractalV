@@ -4,20 +4,27 @@ import meus_links
 import google.generativeai as genai
 
 # --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="FractalV 3.2 Stable", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="FractalV 3.4 Financial", page_icon="🧬", layout="wide")
 
 # --- CSS PREMIUM (BIG NEUMORPHIC) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
 
+    /* Estilo do Cartão Principal */
     .game-card {
-        background-color: #ffffff; padding: 30px; border-radius: 20px;
-        border-left: 8px solid #6c5ce7; border: 1px solid #f0f2f5;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.08); margin-bottom: 25px; transition: transform 0.3s ease;
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 20px;
+        border-left: 8px solid #6c5ce7;
+        border: 1px solid #f0f2f5;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+        transition: transform 0.3s ease;
     }
     .game-card:hover { transform: translateY(-3px); }
 
+    /* Cabeçalho do Cartão */
     .card-header { 
         display: flex; justify-content: space-between; align-items: center; 
         margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f5f5f5; 
@@ -32,8 +39,12 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(108, 92, 231, 0.4);
     }
 
-    .ball-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding: 10px; }
+    /* Container das Bolas */
+    .ball-container { 
+        display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding: 10px;
+    }
 
+    /* ESTILO DAS BOLAS (GRANDES) */
     .ball {
         width: 65px; height: 65px; border-radius: 50%; 
         display: flex; align-items: center; justify-content: center;
@@ -44,11 +55,13 @@ st.markdown("""
     }
     .ball:hover { transform: scale(1.1); box-shadow: 0px 15px 30px -5px rgba(0,0,0,0.3); z-index: 10; }
 
+    /* Cores */
     .bg-roxo { background: radial-gradient(circle at 30% 30%, #be93d6, #8e44ad); }
     .bg-verde { background: radial-gradient(circle at 30% 30%, #58d68d, #27ae60); }
     .bg-azul { background: radial-gradient(circle at 30% 30%, #6dd5fa, #2980b9); }
     .bg-gold { background: radial-gradient(circle at 30% 30%, #f9e79f, #f1c40f); color: #333 !important; text-shadow: none; }
 
+    /* Botão */
     .stButton>button {
         width: 100%; height: 60px; background: linear-gradient(90deg, #6c5ce7, #a29bfe); 
         color: white; font-size: 20px; font-weight: 800; border: none; border-radius: 15px;
@@ -56,28 +69,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CACHE (A SOLUÇÃO DO PISCA-PISCA) ---
-# Esta função congela o resultado. Se chamar de novo com os mesmos dados, ela devolve a memória.
+# --- FUNÇÃO DE CACHE (ESTABILIDADE) ---
 @st.cache_data(ttl=1800, show_spinner=False)
 def calcular_fractal_estavel(loteria_nome, orcamento, link_precos, url_dados):
-    # Instancia o cérebro dentro do cache
     cerebro = fractal_motor.FractalCerebro()
     chave_norm = loteria_nome.replace("á","a").replace("ç","c").replace(" ","_")
     
-    # Executa o cálculo pesado
     resultado = cerebro.gerar_palpite_cloud(
         url_dados, link_precos, chave_norm, orcamento
     )
-    return resultado, cerebro # Retorna o cérebro também para usar a IA depois
-
-# --------------------------------------------------
+    return resultado, cerebro
 
 # --- HEADER ---
 c1, c2 = st.columns([1, 6])
 with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
 with c2: 
-    st.title("FractalV 3.2")
-    st.markdown("### Inteligência Determinística & Visual Studio")
+    st.title("FractalV 3.4")
+    st.markdown("### Inteligência Determinística & Gestão de Banca")
 
 try:
     LINK_TABELA_PRECOS = meus_links.LINK_PRECOS
@@ -100,7 +108,6 @@ with st.sidebar:
     else:
         gemini_key = st.text_input("API Key (Gemini):", type="password")
     
-    # SELETOR DE MODELOS (IA)
     modelo_selecionado = "gemini-pro"
     if gemini_key:
         try:
@@ -116,7 +123,6 @@ with st.sidebar:
     loteria = st.selectbox("Modalidade:", list(SHEETS.keys()))
     orcamento = st.number_input("Capital (R$):", min_value=1.0, value=50.0, step=1.0)
     
-    # Botão para limpar o cache se o usuário quiser forçar novos números
     if st.button("🔄 Forçar Recálculo"):
         st.cache_data.clear()
         st.rerun()
@@ -125,8 +131,6 @@ with st.sidebar:
 if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
     with st.spinner("⚛️ Materializando dados quânticos..."):
         try:
-            # CHAMA A FUNÇÃO COM CACHE
-            # Se você clicar de novo, ele pula esta parte e pega da memória instantaneamente
             res, cerebro_ativo = calcular_fractal_estavel(
                 loteria, orcamento, LINK_TABELA_PRECOS, SHEETS[loteria]['url']
             )
@@ -138,23 +142,30 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 jogos = res['jogos']
                 meta = res['backtest']
                 
-                # Exibe aviso de estabilidade
-                st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta.get('ultimo_concurso', 'N/A')}. (Dados mantidos para consistência).")
+                st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta.get('ultimo_concurso', 'N/A')}.")
 
-                # KPI
-                st.markdown("### 🧠 Plasticidade Neural")
+                # --- 1. PAINEL FINANCEIRO (RESTAURADO!) ---
+                st.markdown("### 📊 Gestão de Banca")
+                col_fin1, col_fin2, col_fin3 = st.columns(3)
+                col_fin1.metric("Jogos Calculados", f"{fin['qtd']} jogos")
+                col_fin2.metric("Custo Total", f"R$ {fin['custo_total']:.2f}")
+                col_fin3.metric("Seu Troco", f"R$ {fin['troco']:.2f}", delta="Saldo Restante")
+                
+                st.divider()
+
+                # --- 2. PAINEL DE INTELIGÊNCIA ---
+                st.markdown("### 🧠 Plasticidade Neural & Entropia")
                 cols = st.columns(3)
                 pesos = meta['pesos_atuais']
-                cols[0].metric("Markov", f"{pesos['Markov']*100:.0f}%")
-                cols[1].metric("Fractal", f"{pesos['Fractal']*100:.0f}%")
-                cols[2].metric("Gauss", f"{pesos['Gauss']*100:.0f}%")
+                cols[0].metric("Markov (Inércia)", f"{pesos['Markov']*100:.0f}%")
+                cols[1].metric("Fractal (Caos)", f"{pesos['Fractal']*100:.0f}%")
+                cols[2].metric("Gauss (Normal)", f"{pesos['Gauss']*100:.0f}%")
                 st.progress(max(pesos.values()))
 
-                # IA (GEMINI) - Esta parte roda sempre para permitir mudar o modelo
+                # IA
                 if gemini_key:
                     with st.chat_message("assistant", avatar="🧬"):
                         st.markdown(f"**Análise ({modelo_selecionado}):**")
-                        # Usamos o cérebro que veio do cache
                         analise = cerebro_ativo.analisar_com_gemini(
                             gemini_key, modelo_selecionado, loteria, fin, jogos[:3], meta
                         )
@@ -164,16 +175,28 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 st.subheader(f"Sequências Otimizadas ({len(jogos)})")
                 
                 css_class = SHEETS[loteria].get("css", "bg-azul")
-                for i, (jg, score) in enumerate(jogos):
+                # Desempacota (jogos, score, entropia)
+                for i, (jg, score, entropia) in enumerate(jogos):
                     bolas_html = ""
                     for num in jg:
                         bolas_html += f'<div class="ball {css_class}">{int(num):02d}</div>'
                     
+                    # Cor da Entropia
+                    cor_entr = "#e74c3c"
+                    if 0.4 <= entropia <= 0.8: cor_entr = "#2ecc71" # Verde (Ideal)
+                    elif entropia > 0.8: cor_entr = "#f1c40f" # Amarelo (Caótico)
+
                     st.markdown(f"""
                     <div class="game-card">
                         <div class="card-header">
                             <span class="game-title">JOGO #{i+1:02d}</span>
-                            <span class="game-score">SCORE: {score:.2f}</span>
+                            <div style="text-align: right;">
+                                <span class="game-score">SCORE: {score:.2f}</span>
+                                <br>
+                                <small style="color: #666; font-size: 11px;">
+                                    ENTROPIA: <b style="color:{cor_entr}">{entropia:.4f}</b>
+                                </small>
+                            </div>
                         </div>
                         <div class="ball-container">{bolas_html}</div>
                     </div>""", unsafe_allow_html=True)
