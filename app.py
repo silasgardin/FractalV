@@ -6,6 +6,7 @@ import google.generativeai as genai
 # --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="FractalV System", page_icon="🧬", layout="wide")
 
+# --- CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
@@ -29,9 +30,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CÁLCULO (CACHE REDUZIDO PARA 60 SEGUNDOS) ---
-# Se atualizar a planilha, basta esperar 1 min ou clicar no botão de forçar
-@st.cache_data(ttl=60, show_spinner=False)
+# --- FUNÇÃO DE CÁLCULO ---
+@st.cache_data(ttl=1800, show_spinner=False)
 def calcular_sistema_integrado(loteria_nome, orcamento):
     try:
         conector = fractal_connector.FractalConnector()
@@ -57,12 +57,20 @@ CONFIG_VISUAL = {
     "Lotomania": "bg-laranja", "Mega da Virada": "bg-verde"
 }
 
+# --- HEADER ---
 c1, c2 = st.columns([1, 6])
 with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
 with c2: 
     st.title("FractalV System")
     st.markdown("### Conectado ao Oráculo V")
 
+# --- FEEDBACK DE ATUALIZAÇÃO (Toast) ---
+# Se o sistema acabou de recarregar por causa do botão, mostra a mensagem
+if 'atualizado_sucesso' in st.session_state and st.session_state['atualizado_sucesso']:
+    st.toast("✅ Cache Limpo! O sistema baixará os dados mais recentes agora.", icon="🔄")
+    st.session_state['atualizado_sucesso'] = False # Reseta para não mostrar sempre
+
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("🧬 Parâmetros")
     
@@ -87,13 +95,21 @@ with st.sidebar:
     loteria = st.selectbox("Modalidade:", list(CONFIG_VISUAL.keys()))
     orcamento = st.number_input("Capital (R$):", min_value=1.0, value=50.0, step=1.0)
     
-    # Botão Importante: Limpa o Cache para pegar o jogo novo IMEDIATAMENTE
+    st.divider()
+    # --- BOTÃO DE ATUALIZAÇÃO COM FEEDBACK ---
+    col_bt1, col_bt2 = st.columns([4,1])
     if st.button("🔄 Atualizar Base de Dados"):
         st.cache_data.clear()
-        st.rerun()
+        st.session_state['atualizado_sucesso'] = True # Marca que clicou
+        st.rerun() # Recarrega a página
+    
+    # Texto de apoio visual
+    if 'atualizado_sucesso' in st.session_state:
+         st.caption("Última ação: Limpeza de Memória")
 
+# --- CORE ---
 if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
-    with st.spinner(f"📡 Buscando último concurso da {loteria}..."):
+    with st.spinner(f"📡 A sincronizar com o último concurso da {loteria}..."):
         try:
             res, cerebro_ativo = calcular_sistema_integrado(loteria, orcamento)
             
@@ -104,11 +120,11 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 jogos = res['jogos']
                 meta = res['backtest']
                 
-                # --- AQUI ESTÁ A CONFIRMAÇÃO VISUAL ---
-                # Mostra bem grande qual concurso o sistema leu
-                st.success(f"✅ **Base Sincronizada:** Cálculos realizados com base no **Concurso #{meta.get('ultimo_concurso', 'N/A')}**")
-                # --------------------------------------
+                # FEEDBACK DO CONCURSO
+                ultimo_conc = meta.get('ultimo_concurso', 'N/A')
+                st.success(f"✅ **Base Sincronizada!** Cálculos realizados sobre o **Concurso #{ultimo_conc}**")
 
+                # PAINEL FINANCEIRO
                 st.markdown("### 📊 Gestão de Banca")
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Jogos", f"{fin['qtd']}")
@@ -117,6 +133,7 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 
                 st.divider()
 
+                # PAINEL DE INTELIGÊNCIA
                 st.markdown("### 🧠 Plasticidade Neural")
                 cols = st.columns(3)
                 pesos = meta['pesos_atuais']
