@@ -1,29 +1,23 @@
 # fractal_engine.py
-import pandas as pd
 import numpy as np
 import xgboost as xgb
 import random
 import warnings
-import meus_links
 from fractal_learner import FractalLearner
+from fractal_connector import FractalConnector # <--- Usa o conector novo
 
 warnings.filterwarnings("ignore")
 
 class FractalVCerebro:
     def __init__(self):
         self.sistema = "FractalV"
-        self.versao = "5.0 (Neural Link)"
+        self.versao = "5.1 (Data Fusion)"
         
-        # Inicia a Memória
         self.learner = FractalLearner()
         pesos_vivos = self.learner.get_pesos_formatados()
-
-        self.mapa_links = {
-            "Lotofacil": "Lotofácil",
-            "Mega_Sena": "Mega Sena",
-            "Quina": "Quina",
-            "Dia_de_Sorte": "Dia de Sorte"
-        }
+        
+        # Instancia o conector para carregar dados
+        self.conector = FractalConnector()
 
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca": 15},
@@ -32,7 +26,6 @@ class FractalVCerebro:
             "Dia_de_Sorte":   {"total": 31, "marca": 7},
         }
         
-        # Catálogo com APRENDIZADO VIVO
         self.modelos_catalogo = {
             "Aprendizado_Vivo":   {"w_mk": pesos_vivos['w_mk'], "w_fr": pesos_vivos['w_fr'], "w_ia": pesos_vivos['w_ia'], "desc": "Evolução contínua baseada em resultados"},
             "Tendencia_Linear":   {"w_mk": 0.6, "w_ia": 0.3, "w_fr": 0.1, "desc": "Segue repetições (Markov Dominante)"},
@@ -41,33 +34,18 @@ class FractalVCerebro:
             "IA_Preditiva":       {"w_mk": 0.0, "w_ia": 1.0, "w_fr": 0.0, "desc": "Apenas Machine Learning (XGBoost)"}
         }
 
-    def carregar_base(self, loteria_chave):
-        nome_no_link = self.mapa_links.get(loteria_chave)
-        if not nome_no_link: return None, None
-        
-        url = meus_links.URLS.get(nome_no_link)
-        
-        try:
-            df = pd.read_csv(url)
-            cols = [c for c in df.columns if c.strip().upper().startswith('D') or c.strip().upper().startswith('B')]
-            for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
-            
-            if 'Concurso' in df.columns:
-                df = df.dropna(subset=['Concurso'])
-                df = df.sort_values(by='Concurso', ascending=True).reset_index(drop=True)
-            return df, cols
-        except Exception as e:
-            return None, None
-        
     def _core_markov(self, hist, total):
+        # (Código Markov Mantido igual)
+        if len(hist) < 2: return {d:0 for d in range(1, total+1)}
         matriz = np.zeros((total + 1, total + 1))
         recorte = hist[-100:] 
         for i in range(len(recorte)-1):
             for u in recorte[i]:
-                if pd.isna(u): continue
+                if np.isnan(u): continue
                 for v in recorte[i+1]:
-                    if pd.isna(v): continue
-                    matriz[int(u)][int(v)] += 1
+                    if np.isnan(v): continue
+                    try: matriz[int(u)][int(v)] += 1
+                    except: pass
         row_sums = matriz.sum(axis=1)
         row_sums[row_sums==0] = 1
         probs = matriz / row_sums[:, None]
@@ -76,11 +54,15 @@ class FractalVCerebro:
         for d in range(1, total+1):
             s = 0; c = 0
             for n in last:
-                if not pd.isna(n): s += probs[int(n)][d]; c += 1
+                if not np.isnan(n): 
+                    try: s += probs[int(n)][d]; c += 1
+                    except: pass
             scores[d] = s/c if c > 0 else 0
         return scores
 
     def _core_xgboost(self, hist, total):
+        # (Código XGBoost Mantido igual - simplificado para brevidade)
+        if len(hist) < 10: return {d:0.5 for d in range(1, total+1)}
         X, y = [], []
         atrasos = {d: 0 for d in range(1, total+1)}
         start = max(0, len(hist)-80)
@@ -106,26 +88,22 @@ class FractalVCerebro:
         return scores
 
     def _core_fractal(self, hist, total):
+        # (Código Fractal Mantido igual)
         scores = {}
         recorte = hist[-100:]
         gaps_history = {d: [] for d in range(1, total+1)}
         current_delay = {d: 0 for d in range(1, total+1)}
-        
         for row in recorte:
             row_set = set(row)
             for d in range(1, total+1):
                 if d in row_set:
                     if current_delay[d] > 0: gaps_history[d].append(current_delay[d])
                     current_delay[d] = 0
-                else:
-                    current_delay[d] += 1
-                    
+                else: current_delay[d] += 1
         for d in range(1, total+1):
             gaps = gaps_history[d]
             atraso_atual = current_delay[d]
-            if len(gaps) < 2:
-                scores[d] = 0.5
-                continue
+            if len(gaps) < 2: scores[d] = 0.5; continue
             media_gap = np.mean(gaps)
             std_gap = np.std(gaps)
             if std_gap == 0: std_gap = 1
@@ -139,11 +117,12 @@ class FractalVCerebro:
         cfg = self.config_base.get(loteria_chave)
         if not cfg: return "Hibrido_Balanceado", 0.0
         
-        df, cols = self.carregar_base(loteria_chave) 
-        if df is None or len(df) < janela_analise + 50: 
+        # USA O CONECTOR PARA PEGAR DADOS FRESCOS
+        hist_full, ultimo_id = self.conector.get_historico(loteria_chave)
+        
+        if hist_full is None or len(hist_full) < janela_analise + 50: 
             return "Hibrido_Balanceado", 0.0
 
-        hist_full = df[cols].values
         placar = {k: 0 for k in self.modelos_catalogo.keys()}
         
         # Backtest
@@ -167,36 +146,35 @@ class FractalVCerebro:
         melhor_modelo = max(placar, key=placar.get)
         media_acertos = placar[melhor_modelo] / janela_analise
         
-        # APRENDIZADO: Atualiza a memória com o vencedor
+        # Aprendizado
         self.learner.regenerar_pesos(melhor_modelo)
-        
-        # Atualiza catálogo interno para refletir o aprendizado imediato
         self.modelos_catalogo["Aprendizado_Vivo"].update(self.learner.get_pesos_formatados())
 
-        return melhor_modelo, media_acertos
+        return melhor_modelo, media_acertos, ultimo_id
 
     def info_card(self, loteria_chave):
-        modelo_vencedor, acertos_medios = self.calibrar_sistema(loteria_chave)
+        modelo_vencedor, acertos_medios, ultimo_id = self.calibrar_sistema(loteria_chave)
         desc_modelo = self.modelos_catalogo[modelo_vencedor]['desc']
-        preco = 3.00
-        if loteria_chave == "Mega_Sena": preco = 5.00
-        elif loteria_chave == "Quina": preco = 2.50
+        
+        # Pega preço atualizado
+        preco = self.conector.get_preco(loteria_chave)
         
         return {
             "loteria": loteria_chave,
             "modelo_ativo": modelo_vencedor,
             "descricao": desc_modelo,
             "performance_recente": f"{acertos_medios:.1f} (Méd. 10 jogos)",
-            "preco_aposta": preco
+            "preco_aposta": preco,
+            "ultimo_concurso": ultimo_id
         }
 
     def processar_jogos(self, loteria_chave, orcamento):
-        modelo_nome, _ = self.calibrar_sistema(loteria_chave)
+        modelo_nome, _, _ = self.calibrar_sistema(loteria_chave)
         pesos = self.modelos_catalogo[modelo_nome]
         
         cfg = self.config_base.get(loteria_chave)
-        df, cols = self.carregar_base(loteria_chave)
-        hist = df[cols].values
+        # USA O CONECTOR
+        hist, _ = self.conector.get_historico(loteria_chave)
         
         s_mk = self._core_markov(hist, cfg['total'])
         s_ia = self._core_xgboost(hist, cfg['total'])
@@ -212,8 +190,9 @@ class FractalVCerebro:
             zebras = sorted(s_fr.items(), key=lambda x: x[1], reverse=True)
             for z in zebras[:3]:
                 if z[0] not in pool_elite: pool_elite.append(z[0])
-
-        qtd_jogos = max(1, int(orcamento // 3.00))
+        
+        preco_aposta = self.conector.get_preco(loteria_chave)
+        qtd_jogos = max(1, int(orcamento // preco_aposta))
         jogos = []
         
         attempts = 0
@@ -231,6 +210,6 @@ class FractalVCerebro:
         return {
             "modelo_utilizado": modelo_nome,
             "jogos": jogos,
-            "total_investido": qtd_jogos * 3.00,
-            "troco": orcamento - (qtd_jogos * 3.00)
+            "total_investido": qtd_jogos * preco_aposta,
+            "troco": orcamento - (qtd_jogos * preco_aposta)
         }
