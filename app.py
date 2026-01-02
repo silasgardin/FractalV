@@ -6,7 +6,6 @@ import google.generativeai as genai
 # --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="FractalV System", page_icon="🧬", layout="wide")
 
-# --- CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
@@ -30,46 +29,40 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE CÁLCULO (CACHE) ---
-@st.cache_data(ttl=1800, show_spinner=False)
+# --- FUNÇÃO DE CÁLCULO (CACHE REDUZIDO PARA 60 SEGUNDOS) ---
+# Se atualizar a planilha, basta esperar 1 min ou clicar no botão de forçar
+@st.cache_data(ttl=60, show_spinner=False)
 def calcular_sistema_integrado(loteria_nome, orcamento):
     try:
-        # Instancia Conector e Motor
         conector = fractal_connector.FractalConnector()
         cerebro = fractal_motor.FractalCerebro()
         
-        # Busca Dados
         historico, ultimo_id = conector.get_historico(loteria_nome)
         preco = conector.get_preco(loteria_nome)
         
         if historico is None:
-            return {"erro": "Falha ao conectar com a base de dados (Oráculo V)."}, cerebro
+            return {"erro": "Falha na conexão com Oráculo V. Verifique se o link CSV está público."}, cerebro
             
-        # Processa
         resultado = cerebro.processar_nucleo(
             historico, ultimo_id, preco, loteria_nome, orcamento
         )
         return resultado, cerebro
         
     except Exception as e:
-        # Tratamento de erro interno na função
-        return {"erro": f"Erro interno de cálculo: {str(e)}"}, None
+        return {"erro": f"Erro interno: {str(e)}"}, None
 
-# --- MAPA VISUAL ---
 CONFIG_VISUAL = {
     "Lotofácil": "bg-roxo", "Mega Sena": "bg-verde", "Quina": "bg-azul",
     "Dia de Sorte": "bg-gold", "Timemania": "bg-gold", "Dupla Sena": "bg-verde",
     "Lotomania": "bg-laranja", "Mega da Virada": "bg-verde"
 }
 
-# --- LAYOUT PRINCIPAL ---
 c1, c2 = st.columns([1, 6])
 with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
 with c2: 
     st.title("FractalV System")
-    st.markdown("### Arquitetura V4.0: Conector + Motor")
+    st.markdown("### Conectado ao Oráculo V")
 
-# --- BARRA LATERAL ---
 with st.sidebar:
     st.header("🧬 Parâmetros")
     
@@ -83,7 +76,6 @@ with st.sidebar:
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
-            # Lista modelos disponíveis
             raw_models = genai.list_models()
             modelos_uteis = [m.name for m in raw_models if 'generateContent' in m.supported_generation_methods and 'gemini' in m.name]
             st.divider()
@@ -95,14 +87,13 @@ with st.sidebar:
     loteria = st.selectbox("Modalidade:", list(CONFIG_VISUAL.keys()))
     orcamento = st.number_input("Capital (R$):", min_value=1.0, value=50.0, step=1.0)
     
-    if st.button("🔄 Forçar Recálculo"):
+    # Botão Importante: Limpa o Cache para pegar o jogo novo IMEDIATAMENTE
+    if st.button("🔄 Atualizar Base de Dados"):
         st.cache_data.clear()
         st.rerun()
 
-# --- EXECUÇÃO DO NÚCLEO ---
 if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
-    with st.spinner(f"📡 A contactar camada de dados (Oráculo V)..."):
-        # INICIO DO BLOCO TRY PRINCIPAL
+    with st.spinner(f"📡 Buscando último concurso da {loteria}..."):
         try:
             res, cerebro_ativo = calcular_sistema_integrado(loteria, orcamento)
             
@@ -113,9 +104,11 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 jogos = res['jogos']
                 meta = res['backtest']
                 
-                st.info(f"🔒 **Decisão Congelada:** Baseada no Concurso #{meta.get('ultimo_concurso', 'N/A')}.")
+                # --- AQUI ESTÁ A CONFIRMAÇÃO VISUAL ---
+                # Mostra bem grande qual concurso o sistema leu
+                st.success(f"✅ **Base Sincronizada:** Cálculos realizados com base no **Concurso #{meta.get('ultimo_concurso', 'N/A')}**")
+                # --------------------------------------
 
-                # PAINEL FINANCEIRO
                 st.markdown("### 📊 Gestão de Banca")
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Jogos", f"{fin['qtd']}")
@@ -124,7 +117,6 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 
                 st.divider()
 
-                # PAINEL DE INTELIGÊNCIA
                 st.markdown("### 🧠 Plasticidade Neural")
                 cols = st.columns(3)
                 pesos = meta['pesos_atuais']
@@ -133,7 +125,6 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 cols[2].metric("Gauss", f"{pesos['Gauss']*100:.0f}%")
                 st.progress(max(pesos.values()))
 
-                # ANÁLISE IA
                 if gemini_key and cerebro_ativo:
                     with st.chat_message("assistant", avatar="🧬"):
                         st.markdown(f"**Análise ({modelo_selecionado}):**")
@@ -145,7 +136,6 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                 st.divider()
                 st.subheader(f"Sequências Otimizadas ({len(jogos)})")
                 
-                # RENDERIZAÇÃO DOS CARTÕES
                 css_class = CONFIG_VISUAL.get(loteria, "bg-azul")
                 
                 for i, (jg, score, entropia) in enumerate(jogos):
@@ -153,7 +143,6 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
                     for num in jg:
                         bolas_html += f'<div class="ball {css_class}">{int(num):02d}</div>'
                     
-                    # Cor da Entropia
                     cor_entr = "#e74c3c"
                     if 0.4 <= entropia <= 0.8: cor_entr = "#2ecc71"
                     elif entropia > 0.8: cor_entr = "#f1c40f"
@@ -172,5 +161,3 @@ if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
 
         except Exception as e:
             st.error(f"Erro Crítico no App: {e}")
-            st.warning("Dica: Verifique se os arquivos 'fractal_connector.py' e 'fractal_motor.py' estão criados corretamente.")
-# --- FIM DO ARQUIVO ---
