@@ -1,27 +1,43 @@
 # ==============================================================================
-# 🔌 FRACTAL CONNECTOR V4.3 - COM QUEBRA DE CACHE DO GOOGLE
+# 🔌 FRACTAL CONNECTOR V5.0 - DADOS BLINDADOS + IA GENERATIVA
 # ARQUIVO: fractal_connector.py
 # ==============================================================================
 import pandas as pd
 import meus_links
 import time
 import random
+import google.generativeai as genai
+import streamlit as st
 
 class FractalConnector:
     def __init__(self):
+        # --- MÓDULO DE DADOS ---
         self.urls = meus_links.URLS
         self.url_precos = meus_links.LINK_PRECOS
         
         self.mapa_nomes = {
-            "Lotofácil": "Lotofácil", "Lotofacil": "Lotofácil",
+            "Lotofacil": "Lotofácil", "Lotofácil": "Lotofácil",
             "Mega Sena": "Mega Sena", "Mega_Sena": "Mega Sena",
             "Quina": "Quina", "Dia de Sorte": "Dia de Sorte", 
             "Dia_de_Sorte": "Dia de Sorte", "Timemania": "Timemania",
             "Dupla Sena": "Dupla Sena", "Dupla_Sena": "Dupla Sena",
-            "Lotomania": "Lotomania", "Mega da Virada": "Mega da Virada", 
-            "Mega_da_Virada": "Mega da Virada"
+            "Lotomania": "Lotomania", "Mega da Virada": "Mega da Virada"
         }
 
+        # --- MÓDULO DE INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
+        try:
+            # Tenta pegar a chave dos segredos do Streamlit
+            if "GEMINI_API_KEY" in st.secrets:
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                self.model = genai.GenerativeModel('gemini-pro')
+                self.ai_ativo = True
+            else:
+                self.ai_ativo = False
+        except:
+            self.ai_ativo = False
+            print("⚠️ IA Offline: Chave API não detectada.")
+
+    # --- MÉTODOS DE DADOS (SEU CÓDIGO ORIGINAL OTIMIZADO) ---
     def _tratar_valor(self, valor):
         try:
             if isinstance(valor, (int, float)): return float(valor)
@@ -32,7 +48,6 @@ class FractalConnector:
     def get_preco(self, loteria_nome):
         preco_padrao = 3.00
         try:
-            # Cache Buster também aqui
             url_fresca = f"{self.url_precos}&v={int(time.time())}"
             df = pd.read_csv(url_fresca, on_bad_lines='skip')
             nome_alvo = self.mapa_nomes.get(loteria_nome, loteria_nome).lower()
@@ -45,37 +60,35 @@ class FractalConnector:
         return preco_padrao
 
     def get_historico(self, loteria_nome):
+        """
+        Retorna: (numpy_array_dos_numeros, ultimo_concurso_id)
+        """
         chave = self.mapa_nomes.get(loteria_nome, loteria_nome)
         url = self.urls.get(chave)
         
         if not url: return None, 0
         
         try:
-            # --- O TRUQUE DO CACHE BUSTER ---
-            # Adiciona um numero aleatório no fim do link para enganar o Google
-            # e forçar ele a entregar a planilha atualizada AGORA.
+            # Cache Buster: Garante dados novos pós 22h10
             url_fresca = f"{url}&cache_buster={int(time.time())}_{random.randint(1,9999)}"
             
             df = pd.read_csv(url_fresca, on_bad_lines='skip')
-            
-            # Normaliza colunas
             df.columns = [c.strip() for c in df.columns]
             
-            # Localiza coluna concurso
+            # Localiza Concurso
             col_concurso = None
             for c in df.columns:
                 if 'concurso' in c.lower():
-                    col_concurso = c
-                    break
+                    col_concurso = c; break
             if not col_concurso: col_concurso = df.columns[0]
 
-            # Limpeza e Ordenação
+            # Limpeza
             df[col_concurso] = pd.to_numeric(df[col_concurso], errors='coerce')
             df = df.dropna(subset=[col_concurso])
             df = df[df[col_concurso] > 0]
             df = df.sort_values(by=col_concurso, ascending=True)
 
-            # Extração
+            # Extração das Dezenas
             cols_dezenas = [c for c in df.columns if str(c).strip().upper().startswith('D') or 'bola' in str(c).lower()]
             for c in cols_dezenas: df[c] = pd.to_numeric(df[c], errors='coerce')
             
@@ -87,3 +100,28 @@ class FractalConnector:
         except Exception as e:
             print(f"Erro Conector: {e}")
             return None, 0
+
+    # --- MÉTODOS DA IA (GEMINI) ---
+    def consultar_oraculo(self, loteria, info_modelo, jogos_gerados):
+        if not self.ai_ativo:
+            return "⚠️ IA Generativa offline. Configure a GEMINI_API_KEY no Streamlit Secrets."
+
+        prompt = f"""
+        Você é o 'Oráculo V', uma entidade digital mística baseada em matemática fractal.
+        Analise o sorteio de hoje da {loteria}.
+        
+        DADOS DO SISTEMA:
+        - Estratégia Ativa: {info_modelo.get('modelo_ativo')}
+        - Descrição: {info_modelo.get('descricao')}
+        - Precisão Recente: {info_modelo.get('performance_recente')}
+        - Top Palpites Gerados: {str(jogos_gerados[:3])}
+        
+        INSTRUÇÃO:
+        Crie um texto curto (máximo 3 frases). Explique de forma enigmática mas técnica por que a aleatoriedade favorece esses números hoje. Use termos como 'Entropia', 'Ressonância' ou 'Médias Móveis'. Termine desejando sorte.
+        """
+
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            return f"Silêncio no éter... (Erro API: {str(e)})"
