@@ -1,6 +1,6 @@
 # ==============================================================================
-# 🧠 ORÁCULO MOTOR V35 - GEMINI PRO STABLE
-# (Correção para erro 404 - Modelo Universal)
+# 🧠 ORÁCULO MOTOR V36 - AUTO-DISCOVERY AI
+# (Detecta automaticamente qual modelo Gemini está disponível)
 # ==============================================================================
 
 import pandas as pd
@@ -14,10 +14,7 @@ warnings.filterwarnings("ignore")
 
 class OraculoCerebro:
     def __init__(self):
-        self.versao = "V35 (Gemini Pro Stable)"
-        
-        # --- CONFIGURAÇÃO FORÇADA PARA O MODELO ESTÁVEL ---
-        self.modelo_ia_nome = "gemini-pro"
+        self.versao = "V36 (Auto-Discovery AI)"
         
         self.config_base = {
             "Lotofacil":      {"total": 25, "marca_base": 15},
@@ -78,7 +75,7 @@ class OraculoCerebro:
             
         return tabela, preco_base
 
-    # --- MATEMÁTICA FRACTAL ---
+    # --- MATEMÁTICA ---
     def _core_markov(self, hist, total):
         matriz = np.zeros((total + 1, total + 1)); recorte = hist[-100:]
         for i in range(len(recorte)-1):
@@ -149,34 +146,59 @@ class OraculoCerebro:
         custo = tabela[melhor]
         return {"tipo": "Combo" if melhor > base else "Simples", "dezenas": melhor, "qtd": qtd_final, "troco": orcamento - (qtd_final*custo)}
 
-    # --- ANÁLISE DE I.A. (GEMINI PRO) ---
+    # --- INTEGRAÇÃO INTELIGENTE (AUTO-DISCOVERY) ---
     def analisar_com_gemini(self, api_key, loteria, estrategia_fin, jogos_top3):
         try:
             genai.configure(api_key=api_key)
             
-            # Utilizando 'gemini-pro' (Modelo Universal)
-            model = genai.GenerativeModel('gemini-pro')
+            # --- AUTO-DISCOVERY: Busca qual modelo funciona ---
+            modelo_escolhido = 'gemini-pro' # Padrão
+            
+            try:
+                # Pergunta para a API quais modelos estão disponíveis
+                lista_modelos = []
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        lista_modelos.append(m.name)
+                
+                # Tenta achar um 'flash' primeiro (mais rápido)
+                for m in lista_modelos:
+                    if 'flash' in m:
+                        modelo_escolhido = m
+                        break
+                else:
+                    # Se não tiver flash, pega o primeiro que tiver 'gemini'
+                    for m in lista_modelos:
+                        if 'gemini' in m:
+                            modelo_escolhido = m
+                            break
+            except:
+                pass # Se der erro na listagem, usa o padrão 'gemini-pro'
+
+            # Cria o modelo com o nome descoberto
+            model = genai.GenerativeModel(modelo_escolhido)
             
             jogos_texto = "\n".join([f"- Jogo: {j[0]} (Score Mat: {j[1]:.2f})" for j in jogos_top3])
             
             prompt = f"""
-            Você é o 'Oráculo', um matemático especialista em loterias.
-            Analise os dados gerados para a {loteria}:
+            Aja como um Matemático Especialista em Loterias.
+            Analise os dados gerados pelo meu algoritmo para a {loteria}:
             
-            1. Estratégia: {estrategia_fin['estrategia']}
-            2. Jogos (Top 3):
+            1. Estratégia Financeira: {estrategia_fin['estrategia']}
+            2. Jogos Gerados (Top 3):
             {jogos_texto}
             
             Responda em Português (máx 3 linhas):
-            - Por que esta estratégia financeira é eficiente?
+            - Por que esta estratégia é eficiente?
             - Cite uma curiosidade estatística sobre os números do primeiro jogo.
+            (Modelo usado: {modelo_escolhido})
             """
             
             response = model.generate_content(prompt)
             return response.text
         
         except Exception as e:
-            return f"⚠️ IA indisponível: {str(e)}"
+            return f"⚠️ Nota: IA indisponível ({str(e)}). Os jogos matemáticos acima estão corretos."
 
     # --- GERAÇÃO CLOUD ---
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
