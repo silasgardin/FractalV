@@ -64,6 +64,8 @@ with st.sidebar:
         # Fallback apenas para não travar se você esquecer de configurar o segredo
         st.warning("⚠️ Chave não encontrada nos Secrets.")
         gemini_key = st.text_input("Cole sua chave AIza... manualmente:", type="password")
+    st.divider()
+    
     if gemini_key:
         if st.button("🛠️ Testar Conexão Gemini", type="secondary"):
             try:
