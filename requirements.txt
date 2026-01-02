@@ -3,4 +3,6 @@ pandas
 numpy
 xgboost
 plotly
-scikit-learn
+gspread
+oauth2client
+google-generativeai
