@@ -1,151 +1,107 @@
 import streamlit as st
-import fractal_motor 
-import fractal_connector 
-import google.generativeai as genai
-import time
+import pandas as pd
+import plotly.express as px
+from fractalv_motor import FractalVCerebro # Importa a nova classe
 
-# --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="FractalV System", page_icon="🧬", layout="wide")
+# Configuração da Página
+st.set_page_config(page_title="FractalV Dashboard", layout="wide", page_icon="🌀")
 
+# CSS para customizar a identidade visual
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
-    .game-card { background-color: #ffffff; padding: 30px; border-radius: 20px; border-left: 8px solid #6c5ce7; border: 1px solid #f0f2f5; box-shadow: 0 15px 35px rgba(0,0,0,0.08); margin-bottom: 25px; transition: transform 0.3s ease; }
-    .game-card:hover { transform: translateY(-3px); }
-    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f5f5f5; }
-    .game-title { font-family: 'Helvetica', sans-serif; font-weight: 900; color: #2d3436; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-    .game-score { background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; padding: 8px 18px; border-radius: 30px; font-size: 14px; font-weight: 800; }
-    .ball-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 10px; }
-    .ball { width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 24px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.25); box-shadow: inset 0px -5px 12px rgba(0,0,0,0.3), inset 0px 5px 12px rgba(255,255,255,0.25), 0px 10px 20px -5px rgba(0,0,0,0.2); border: 3px solid rgba(255,255,255,0.15); cursor: default; transition: all 0.2s; }
-    .ball:hover { transform: scale(1.1); box-shadow: 0px 15px 30px -5px rgba(0,0,0,0.3); z-index: 10; }
-    .bg-roxo { background: radial-gradient(circle at 30% 30%, #be93d6, #8e44ad); }
-    .bg-verde { background: radial-gradient(circle at 30% 30%, #58d68d, #27ae60); }
-    .bg-azul { background: radial-gradient(circle at 30% 30%, #6dd5fa, #2980b9); }
-    .bg-gold { background: radial-gradient(circle at 30% 30%, #f9e79f, #f1c40f); color: #333 !important; text-shadow: none; }
-    .bg-laranja { background: radial-gradient(circle at 30% 30%, #fab1a0, #e17055); }
-    .stButton>button { width: 100%; height: 60px; background: linear-gradient(90deg, #6c5ce7, #a29bfe); color: white; font-size: 20px; font-weight: 800; border: none; border-radius: 15px; }
-    .stProgress > div > div > div > div { background-color: #6c5ce7; }
+    .reportview-container {
+        background: #0e1117;
+    }
+    .main-header {
+        font-family: 'Helvetica Neue', sans-serif;
+        color: #4CAF50;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# SEM CACHE PARA FORÇAR DOWNLOAD NOVO
-def calcular_com_progresso(loteria_nome, orcamento, barra_progresso, status_text):
-    try:
-        status_text.text("🔌 Iniciando conexão segura com Google Drive...")
-        barra_progresso.progress(10)
-        time.sleep(0.1)
-        
-        conector = fractal_connector.FractalConnector()
-        cerebro = fractal_motor.FractalCerebro()
-        
-        status_text.text("💰 Atualizando tabela de preços...")
-        barra_progresso.progress(30)
-        preco = conector.get_preco(loteria_nome)
-        
-        # Aqui ele vai baixar com o link novo (Cache Buster)
-        status_text.text(f"📜 Forçando download do último CSV da {loteria_nome}...")
-        barra_progresso.progress(50)
-        historico, ultimo_id = conector.get_historico(loteria_nome)
-        
-        if historico is None:
-            barra_progresso.progress(0)
-            return {"erro": "Falha na conexão. O Google Drive não respondeu."}, cerebro
-            
-        status_text.text(f"🧠 Aplicando Entropia Fractal no Concurso #{ultimo_id}...")
-        barra_progresso.progress(80)
-        
-        resultado = cerebro.processar_nucleo(
-            historico, ultimo_id, preco, loteria_nome, orcamento
-        )
-        
-        status_text.text("✅ Finalizando...")
-        barra_progresso.progress(100)
-        time.sleep(0.2)
-        
-        return resultado, cerebro
-        
-    except Exception as e:
-        return {"erro": f"Erro interno: {str(e)}"}, None
+# Inicializa o Motor FractalV
+@st.cache_resource
+def get_fractal():
+    return FractalVCerebro()
 
-CONFIG_VISUAL = {
-    "Lotofácil": "bg-roxo", "Mega Sena": "bg-verde", "Quina": "bg-azul",
-    "Dia de Sorte": "bg-gold", "Timemania": "bg-gold", "Dupla Sena": "bg-verde",
-    "Lotomania": "bg-laranja", "Mega da Virada": "bg-verde"
-}
+fractal = get_fractal()
 
-c1, c2 = st.columns([1, 6])
-with c1: st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=100)
-with c2: 
+# --- HEADER ---
+col_logo, col_title = st.columns([1, 5])
+with col_logo:
+    st.markdown("# 🌀")
+with col_title:
     st.title("FractalV System")
-    st.markdown("### Conectado ao Oráculo V")
+    st.markdown("**Matemática Estatística Adaptativa & Backtest Contínuo**")
 
-# FEEDBACK DE ATUALIZAÇÃO FORÇADA
-if 'msg_sucesso' in st.session_state:
-    st.toast(st.session_state['msg_sucesso'], icon="🚀")
-    del st.session_state['msg_sucesso']
+st.markdown("---")
 
-with st.sidebar:
-    st.header("🧬 Parâmetros")
-    if "GEMINI_KEY" in st.secrets:
-        gemini_key = st.secrets["GEMINI_KEY"]
-        st.success("🔐 Chave Autenticada")
-    else: gemini_key = st.text_input("API Key (Gemini):", type="password")
-    
-    modelo_selecionado = "gemini-pro"
-    if gemini_key:
-        try:
-            genai.configure(api_key=gemini_key)
-            raw_models = genai.list_models()
-            modelos_uteis = [m.name for m in raw_models if 'generateContent' in m.supported_generation_methods and 'gemini' in m.name]
-            st.divider(); st.markdown("🤖 **Cérebro IA**"); modelo_selecionado = st.selectbox("Versão:", modelos_uteis, index=0)
-        except: pass
+# --- SIDEBAR: STATUS DO SISTEMA ---
+st.sidebar.header("🖥️ Status do FractalV")
+st.sidebar.success("Motor Matemático: Online")
+st.sidebar.info(f"Versão Core: {fractal.versao}")
+st.sidebar.markdown("---")
+st.sidebar.write("O sistema recalibra os pesos estatísticos (Markov vs Fractal vs IA) a cada nova execução, verificando a eficiência nos últimos 10 concursos.")
 
-    st.divider()
-    loteria = st.selectbox("Modalidade:", list(CONFIG_VISUAL.keys()))
-    orcamento = st.number_input("Capital (R$):", min_value=1.0, value=50.0, step=1.0)
-    
-    st.divider()
-    # BOTÃO DE ATUALIZAÇÃO MAIS ROBUSTO
-    if st.button("🔄 Atualizar Base de Dados"):
-        st.cache_data.clear()
-        st.session_state['msg_sucesso'] = "Memória Limpa! Clique em 'Ativar Núcleo' para baixar os dados novos."
-        st.rerun()
+# --- ÁREA DE CARTÕES (JOGOS) ---
+st.subheader("📊 Painel de Controle de Apostas")
+loterias = ["Lotofacil", "Mega_Sena", "Quina"]
 
-if st.button("ATIVAR NÚCLEO FRACTAL", type="primary"):
-    progresso_bar = st.progress(0, text="Iniciando...")
-    status_msg = st.empty()
-    
-    try:
-        res, cerebro_ativo = calcular_com_progresso(loteria, orcamento, progresso_bar, status_msg)
-        progresso_bar.empty(); status_msg.empty()
+cols = st.columns(len(loterias))
 
-        if "erro" in res:
-            st.error(f"🚨 {res['erro']}")
-        else:
-            fin = res['financeiro']; jogos = res['jogos']; meta = res['backtest']
+for idx, loteria in enumerate(loterias):
+    with cols[idx]:
+        with st.container(border=True):
+            st.markdown(f"### 🎲 {loteria.replace('_', ' ')}")
             
-            # MOSTRA O ÚLTIMO CONCURSO BEM GRANDE
-            st.success(f"✅ **DADOS ATUALIZADOS!** Último sorteio detectado na planilha: **#{meta.get('ultimo_concurso', 'N/A')}**")
+            # Consulta ao Cérebro FractalV
+            card_info = fractal.info_card(loteria)
+            
+            if card_info:
+                # Exibição do Modelo Adaptativo Atual
+                st.markdown(f"**Modelo Ativo:** `{card_info['modelo_ativo']}`")
+                st.caption(f"Lógica: {card_info['descricao']}")
+                
+                # Métrica de Performance
+                st.metric(label="Acertos Médios (Backtest)", value=card_info['performance_recente'])
+                
+                st.divider()
+                
+                # Input Financeiro
+                val_aposta = card_info['preco_aposta']
+                orcamento = st.number_input(f"Investimento (R$)", min_value=val_aposta, value=20.0, step=val_aposta, key=f"orc_{loteria}")
+                
+                jogos_calc = int(orcamento // val_aposta)
+                st.caption(f"Gera aprox. {jogos_calc} jogos")
+                
+                # Botão de Execução
+                if st.button(f"Calcular {loteria}", type="primary", key=f"btn_{loteria}"):
+                    with st.spinner(f"FractalV analisando padrões de {loteria}..."):
+                        resultado = fractal.processar_jogos(loteria, orcamento)
+                        
+                        st.success(f"Cálculo Finalizado! Modelo usado: {resultado['modelo_utilizado']}")
+                        
+                        # Tabela de Jogos
+                        df_jogos = pd.DataFrame(
+                            [{"Dezenas": str(j[0]), "Score Potência": f"{j[1]:.4f}"} for j in resultado['jogos']]
+                        )
+                        st.dataframe(df_jogos, hide_index=True)
+                        st.info(f"Troco Estimado: R$ {resultado['troco']:.2f}")
 
-            st.markdown("### 📊 Gestão de Banca")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Jogos", f"{fin['qtd']}"); col2.metric("Custo", f"R$ {fin['custo_total']:.2f}"); col3.metric("Troco", f"R$ {fin['troco']:.2f}")
-            st.divider()
+                # Gráfico de Evolução (Placeholder para dados reais futuros)
+                with st.expander("📈 Evolução da Assertividade"):
+                    # Aqui ligaremos os dados reais do histórico de acertos
+                    dados_demo = pd.DataFrame({
+                        'Concurso': [1,2,3,4,5],
+                        'Performance': [11, 12, 11, 14, 13] if loteria == "Lotofacil" else [3, 2, 4, 3, 4]
+                    })
+                    fig = px.area(dados_demo, x='Concurso', y='Performance', title="Tendência Recente")
+                    fig.update_layout(height=200, margin=dict(l=20, r=20, t=30, b=20))
+                    st.plotly_chart(fig, use_container_width=True)
 
-            st.markdown("### 🧠 Plasticidade Neural")
-            cols = st.columns(3); pesos = meta['pesos_atuais']
-            cols[0].metric("Markov", f"{pesos['Markov']*100:.0f}%"); cols[1].metric("Fractal", f"{pesos['Fractal']*100:.0f}%"); cols[2].metric("Gauss", f"{pesos['Gauss']*100:.0f}%")
-            st.progress(max(pesos.values()))
+            else:
+                st.warning("Base de dados CSV não encontrada ou vazia.")
 
-            if gemini_key and cerebro_ativo:
-                with st.chat_message("assistant", avatar="🧬"):
-                    st.markdown(f"**Análise ({modelo_selecionado}):**")
-                    st.write(cerebro_ativo.analisar_com_gemini(gemini_key, modelo_selecionado, loteria, fin, jogos[:3], meta))
-
-            st.divider(); st.subheader(f"Sequências Otimizadas ({len(jogos)})")
-            css_class = CONFIG_VISUAL.get(loteria, "bg-azul")
-            for i, (jg, score, entropia) in enumerate(jogos):
-                bolas_html = "".join([f'<div class="ball {css_class}">{int(num):02d}</div>' for num in jg])
-                cor_entr = "#2ecc71" if 0.4 <= entropia <= 0.8 else ("#f1c40f" if entropia > 0.8 else "#e74c3c")
-                st.markdown(f"""<div class="game-card"><div class="card-header"><span class="game-title">JOGO #{i+1:02d}</span><div style="text-align: right;"><span class="game-score">SCORE: {score:.2f}</span><br><small style="color:#666; font-size:11px;">ENTROPIA: <b style="color:{cor_entr}">{entropia:.4f}</b></small></div></div><div class="ball-container">{bolas_html}</div></div>""", unsafe_allow_html=True)
-    except Exception as e: st.error(f"Erro Crítico: {e}")
+# --- RODAPÉ ---
+st.markdown("---")
+st.markdown(f"© 2026 **FractalV Systems** | Valinhos, SP | Versão {fractal.versao}")
