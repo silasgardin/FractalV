@@ -2,6 +2,7 @@ import streamlit as st
 import oraculo_motor
 import meus_links 
 
+# --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="Oráculo V40 Pro", page_icon="🔮", layout="wide")
 
 st.markdown("""
@@ -110,7 +111,9 @@ if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
 
                 st.divider()
                 for i, (jg, score) in enumerate(jogos):
-                    nums_fmt = " - ".join([f"{n:02d}" for n in jg])
+                    # AQUI ESTAVA O ERRO. ADICIONEI int(n) PARA CORRIGIR:
+                    nums_fmt = " - ".join([f"{int(n):02d}" for n in jg])
+                    
                     st.markdown(f"""
                     <div class="game-card">
                         <div class="game-score">JOGO {i+1:02d} (Score: {score:.2f})</div>
