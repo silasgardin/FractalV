@@ -3,7 +3,7 @@ import oraculo_motor
 import meus_links 
 
 # --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="Oráculo V41", page_icon="🔮", layout="wide")
+st.set_page_config(page_title="Oráculo V42", page_icon="🔮", layout="wide")
 
 st.markdown("""
 <style>
@@ -47,7 +47,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🔮 Oráculo V41 - Adaptive Backtest")
+st.title("🔮 Oráculo V42 - Fail-Safe System")
+st.markdown("### Geração Garantida com Backtest Adaptativo")
 
 try:
     LINK_TABELA_PRECOS = meus_links.LINK_PRECOS
@@ -80,8 +81,8 @@ with st.sidebar:
     loteria = st.selectbox("Modalidade:", list(SHEETS.keys()))
     orcamento = st.number_input("💰 Orçamento (R$):", min_value=1.0, value=50.0, step=1.0)
 
-if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
-    with st.spinner("📡 A rodar Backtest..."):
+if st.button("🔮 GERAR PALPITES AGORA", type="primary"):
+    with st.spinner("📡 A processar dados..."):
         try:
             cerebro = oraculo_motor.OraculoCerebro()
             chave_norm = loteria.replace("á","a").replace("ç","c").replace(" ","_")
@@ -96,10 +97,10 @@ if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
                 fin = res['financeiro']
                 jogos = res['jogos']
                 
-                st.markdown("### 📊 Resultado do Backtest")
+                st.markdown("### 📊 Resultado Financeiro")
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Estratégia Vencedora", res['backtest']['vencedora'])
-                c2.metric("Jogos", fin['qtd'])
+                c1.metric("Jogos Gerados", fin['qtd'])
+                c2.metric("Custo Total", f"R$ {fin['custo_total']:.2f}")
                 c3.metric("Troco", f"R$ {fin['troco']:.2f}")
                 
                 if gemini_key:
@@ -110,11 +111,11 @@ if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
                         st.write(analise)
 
                 st.divider()
-                st.subheader(f"🎲 Palpites ({len(jogos)} jogos)")
+                st.subheader(f"🎲 Seus Palpites ({len(jogos)} jogos)")
                 
                 for i, (jg, score) in enumerate(jogos):
-                    # --- CORREÇÃO DEFINITIVA DO ERRO 'FLOAT' ---
-                    # Convertemos cada número 'n' para int() antes de formatar
+                    # --- A CORREÇÃO MÁGICA ESTÁ AQUI ---
+                    # int(n) converte 5.0 para 5, permitindo o formato :02d
                     nums_fmt = " - ".join([f"{int(n):02d}" for n in jg])
                     
                     st.markdown(f"""
@@ -125,4 +126,4 @@ if st.button("🔮 EXECUTAR BACKTEST E GERAR", type="primary"):
                     """, unsafe_allow_html=True)
 
         except Exception as e:
-            st.error(f"Erro crítico: {e}")
+            st.error(f"Erro inesperado: {e}")
