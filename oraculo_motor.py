@@ -1,8 +1,6 @@
 # ==============================================================================
-# 🧠 ORÁCULO MOTOR V42 - FAIL-SAFE MODE
-# (Garante geração de números mesmo se a base de dados falhar)
+# 🧠 ORÁCULO MOTOR V42 - FAIL-SAFE (GERAÇÃO GARANTIDA)
 # ==============================================================================
-
 import pandas as pd
 import numpy as np
 import random
@@ -14,31 +12,20 @@ warnings.filterwarnings("ignore")
 class OraculoCerebro:
     def __init__(self):
         self.versao = "V42 (Fail-Safe)"
-        
         self.config_base = {
-            "Lotofacil":      {"total": 25, "marca_base": 15},
-            "Mega_Sena":      {"total": 60, "marca_base": 6},
-            "Quina":          {"total": 80, "marca_base": 5},
-            "Dia_de_Sorte":   {"total": 31, "marca_base": 7},
-            "Timemania":      {"total": 80, "marca_base": 10},
-            "Dupla_Sena":     {"total": 50, "marca_base": 6},
-            "Lotomania":      {"total": 100,"marca_base": 50},
-            "Mega_da_Virada": {"total": 60, "marca_base": 6}
+            "Lotofacil": {"total": 25, "marca_base": 15}, "Mega_Sena": {"total": 60, "marca_base": 6},
+            "Quina": {"total": 80, "marca_base": 5}, "Dia_de_Sorte": {"total": 31, "marca_base": 7},
+            "Timemania": {"total": 80, "marca_base": 10}, "Dupla_Sena": {"total": 50, "marca_base": 6},
+            "Lotomania": {"total": 100,"marca_base": 50}, "Mega_da_Virada": {"total": 60, "marca_base": 6}
         }
-        
-        # Preços de segurança caso a planilha falhe
         self.tabela_precos_default = {
-            "Mega_Sena": 5.00, "Mega_da_Virada": 5.00, "Lotofacil": 3.00,
-            "Quina": 2.50, "Dia_de_Sorte": 2.50, "Timemania": 3.50, 
-            "Lotomania": 3.00, "Dupla_Sena": 2.50
+            "Mega_Sena": 6.00, "Mega_da_Virada": 6.00, "Lotofacil": 3.50,
+            "Quina": 3.00, "Dia_de_Sorte": 2.50, "Timemania": 3.50, "Lotomania": 3.00, "Dupla_Sena": 3.00
         }
 
     def carregar_csv(self, url):
-        try:
-            # Tenta ler com tratamento de erro de linhas
-            return pd.read_csv(url, on_bad_lines='skip')
-        except:
-            return None
+        try: return pd.read_csv(url, on_bad_lines='skip')
+        except: return None
 
     def _tratar_preco(self, valor_str):
         try:
@@ -48,180 +35,113 @@ class OraculoCerebro:
         except: return 0.0
 
     def calcular_limite_jogos(self, url_precos, loteria_chave, orcamento_usuario):
-        df = self.carregar_csv(url_precos)
-        preco_unitario = 0.0
+        preco_unitario = 3.00 # Valor de segurança
         
-        # Tenta pegar preço da planilha
-        if df is not None:
-            try:
+        # Tenta ler preço real
+        try:
+            df = self.carregar_csv(url_precos)
+            if df is not None:
                 for _, row in df.iterrows():
-                    nome_csv = str(row[0]).lower().replace('á','a').replace('ã','a').replace(' ','_')
-                    if loteria_chave.lower() in nome_csv:
-                        preco_unitario = self._tratar_preco(row[1])
-                        break
-            except: pass
-        
-        # Se falhar, usa o padrão fixo
-        if preco_unitario <= 0.10: # Proteção contra preço zero
-            for k, v in self.tabela_precos_default.items():
-                if loteria_chave.lower() in k.lower():
-                    preco_unitario = v; break
-            if preco_unitario <= 0: preco_unitario = 3.00 # Último recurso
-            
+                    if loteria_chave.lower() in str(row[0]).lower().replace(' ','_'):
+                        val = self._tratar_preco(row[1])
+                        if val > 0: preco_unitario = val; break
+        except: pass
+
         qtd_jogos = int(orcamento_usuario // preco_unitario)
-        
-        return {
-            "qtd": max(1, qtd_jogos), # Garante pelo menos 1 tentativa
-            "preco_unit": preco_unitario,
-            "troco": orcamento_usuario - (qtd_jogos * preco_unitario),
-            "custo_total": qtd_jogos * preco_unitario
-        }
+        return {"qtd": max(1, qtd_jogos), "preco_unit": preco_unitario, "troco": orcamento_usuario - (qtd_jogos * preco_unitario), "custo_total": qtd_jogos * preco_unitario}
 
     def executar_backtest(self, hist, total_dezenas):
-        # Se não tiver histórico suficiente, retorna padrão
-        if len(hist) < 5: 
-            return "Estratégia Padrão (Dados Insuficientes)", {}
-
+        # Retorna estratégia padrão se não houver dados suficientes
+        if len(hist) < 5: return "Estratégia Padrão (Dados Insuficientes)", {}
+        
+        scores = {"Markov (Inércia)": 0, "Fractal (Equilíbrio)": 0}
         try:
-            scores = {"Markov (Inércia)": 0, "Fractal (Equilíbrio)": 0}
-            # Usa apenas os últimos 5 para ser rápido e não quebrar
             teste = hist[-5:]
-            
             for i in range(len(teste)-1):
                 passado = set([int(x) for x in teste[i] if pd.notna(x)])
                 futuro = set([int(x) for x in teste[i+1] if pd.notna(x)])
-                
-                # Teste simples
-                p_mk = set(list(passado)[:len(passado)//2])
-                scores["Markov (Inércia)"] += len(p_mk.intersection(futuro))
-                
-            return max(scores, key=scores.get), scores
-        except:
-            return "Estratégia Balanceada", {}
+                # Teste simples de interseção
+                scores["Markov (Inércia)"] += len(passado.intersection(futuro))
+        except: pass
+        
+        return max(scores, key=scores.get), scores
 
     def analisar_com_gemini(self, api_key, loteria, dados_fin, jogos_top3, backtest_info):
         try:
             genai.configure(api_key=api_key)
-            # Tenta encontrar o melhor modelo disponível
+            # Busca modelo disponível (Auto-Discovery)
             modelo = "gemini-pro"
             try:
                 ms = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 for m in ms: 
-                    if 'flash' in m: modelo = m; break # Prioriza Flash
-                else:
-                    if ms: modelo = ms[0] # Pega o primeiro que tiver
+                    if 'flash' in m: modelo = m; break
+                else: 
+                    if ms: modelo = ms[0]
             except: pass
 
             model = genai.GenerativeModel(modelo)
             vencedora = backtest_info.get('vencedora', 'Padrão')
             jogos_txt = "\n".join([f"- {j[0]}" for j in jogos_top3])
             
-            prompt = f"""
-            Você é um matemático especialista em loterias.
-            Analise estes palpites para a {loteria}.
-            
-            Estratégia usada: {vencedora}
-            Orçamento Cliente: R$ {dados_fin['orcamento_inicial']:.2f}
-            
-            Jogos:
-            {jogos_txt}
-            
-            Responda em Português (muito breve):
-            1. Por que a estratégia '{vencedora}' é interessante hoje?
-            2. Analise os números do primeiro jogo (pares, ímpares ou sequência).
-            """
+            prompt = f"Analise estes palpites de loteria ({loteria}).\nEstratégia: {vencedora}\nJogos:\n{jogos_txt}\n\nResponda em Português (curto):\n1. Por que usar a estratégia '{vencedora}'?\n2. Curiosidade sobre o primeiro jogo."
             response = model.generate_content(prompt)
             return response.text
-        except Exception as e:
-            return f"⚠️ IA indisponível no momento: {str(e)}"
+        except Exception as e: return f"⚠️ IA Off: {str(e)}"
 
     def gerar_palpite_cloud(self, url_dados, url_precos, loteria_chave, orcamento):
-        # 1. Configuração Inicial
-        cfg = self.config_base.get(loteria_chave)
-        if not cfg: cfg = self.config_base["Mega_Sena"]
+        cfg = self.config_base.get(loteria_chave, self.config_base["Mega_Sena"])
         
-        # 2. Carregamento de Dados (Com proteção)
+        # 1. Carrega Dados (Fail-Safe)
         df = self.carregar_csv(url_dados)
         hist = []
-        
-        if df is not None and not df.empty:
+        if df is not None:
             try:
-                # Filtra colunas de dezenas (D1, D2...)
                 cols = [c for c in df.columns if c.strip().upper().startswith('D')]
                 for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
-                df = df.dropna(subset=['Concurso']) # Remove linhas vazias
-                df = df.sort_values('Concurso')
+                df = df.dropna(subset=['Concurso']).sort_values('Concurso')
                 hist = df[cols].values
-            except:
-                hist = [] # Falha silenciosa para não travar
-        
-        # 3. Backtest e Finanças
+            except: pass
+
+        # 2. Backtest e Finanças
         vencedora, scores = self.executar_backtest(hist, cfg['total'])
         fin = self.calcular_limite_jogos(url_precos, loteria_chave, orcamento)
         fin['orcamento_inicial'] = orcamento
-        
-        # 4. Geração dos Jogos (O CORAÇÃO DO SISTEMA)
+
+        # 3. Geração de Jogos
         jogos = []
         marca = cfg['marca_base']
         pool = list(range(1, cfg['total'] + 1))
         
-        # Tenta pegar o último sorteio. Se não der, cria lista vazia.
-        last_int = []
+        # Tenta pegar último sorteio limpo
+        last_draw = []
         if len(hist) > 0:
-            last = hist[-1]
-            last_int = [int(x) for x in last if pd.notna(x)]
-        
-        tentativas = 0
-        # Proteção contra loop infinito
-        while len(jogos) < fin['qtd'] and tentativas < 2000:
-            tentativas += 1
-            jg = []
-            
-            try:
-                # LÓGICA DE PRIORIDADE (Tentativa Inteligente)
-                if len(last_int) >= 5 and "Markov" in vencedora:
-                    # Tenta puxar repetidas
-                    qtd_rep = min(len(last_int), int(marca * 0.6))
-                    jg = random.sample(last_int, qtd_rep)
-                    
-                    # Completa com números novos
-                    restantes = [n for n in pool if n not in jg]
-                    faltam = marca - len(jg)
-                    jg += random.sample(restantes, faltam)
-                
-                else:
-                    # LÓGICA PURA (Fractal/Aleatória - Funciona sempre)
-                    jg = random.sample(pool, marca)
+            last_draw = [int(x) for x in hist[-1] if pd.notna(x)]
 
-                # Ordena e Converte para Inteiro (CRUCIAL PARA NÃO DAR ERRO VISUAL)
-                jg = sorted([int(x) for x in jg])
+        tentativas = 0
+        while len(jogos) < fin['qtd'] and tentativas < 1000:
+            tentativas += 1
+            try:
+                # Tenta usar lógica inteligente
+                if len(last_draw) > 5:
+                    q_rep = int(marca * 0.6)
+                    jg = random.sample(last_draw, min(len(last_draw), q_rep))
+                    restantes = [n for n in pool if n not in jg]
+                    jg += random.sample(restantes, marca - len(jg))
+                else:
+                    # Se não houver dados, gera aleatório (Backup)
+                    jg = random.sample(pool, marca)
                 
-                # Validação simples para Lotofácil (Soma não pode ser absurda)
-                if "facil" in loteria_chave.lower():
-                    if not (150 <= sum(jg) <= 260): continue # Pula jogo muito estranho
+                jg = sorted([int(n) for n in jg]) # Garante inteiros
                 
-                # Adiciona se for único
                 if jg not in [x[0] for x in jogos]:
-                    score = random.uniform(8.5, 9.9)
+                    score = random.uniform(8.0, 9.9)
                     jogos.append((jg, score))
-                    
-            except Exception:
-                # LÓGICA DE EMERGÊNCIA (Se tudo der errado, gera aleatório simples)
-                # Isso garante que o usuário NUNCA fique sem números
-                backup = sorted(random.sample(pool, marca))
-                if backup not in [x[0] for x in jogos]:
-                    jogos.append((backup, 7.0))
-        
-        # Ordena por score
-        jogos.sort(key=lambda x: x[1], reverse=True)
-        
-        # Se mesmo assim não gerou nada (muito raro), força 1 jogo
-        if not jogos:
-            jg_final = sorted(random.sample(pool, marca))
-            jogos.append((jg_final, 5.0))
+            except: continue
             
-        return {
-            "financeiro": fin,
-            "backtest": {"vencedora": vencedora, "scores": scores},
-            "jogos": jogos
-        }
+        # 4. Último Recurso (Se tudo falhar, gera 1 jogo aleatório)
+        if not jogos:
+            jg = sorted(random.sample(pool, marca))
+            jogos.append((jg, 5.0))
+
+        jogos.sort(key=lambda x: x[1], reverse=True)
+        return {"financeiro": fin, "backtest": {"vencedora": vencedora, "scores": scores}, "jogos": jogos}
