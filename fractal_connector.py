@@ -28,7 +28,7 @@ class FractalConnector:
         try:
             # Tenta pegar a chave dos segredos do Streamlit
             if "GEMINI_API_KEY" in st.secrets:
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                genai.configure(api_key=st.secrets["GEMINI_KEY"])
                 self.model = genai.GenerativeModel('gemini-pro')
                 self.ai_ativo = True
             else:
