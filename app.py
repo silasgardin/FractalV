@@ -21,8 +21,6 @@ st.markdown("""
     .stat-box { font-size: 11px; color: #aaa; background: #1f2937; padding: 4px 8px; border-radius: 4px; margin-top: 5px; display: inline-block; }
     .stProgress > div > div > div > div { background-color: #a855f7; }
     div[data-testid="stTable"] { font-size: 14px; }
-    
-    /* Box Financeiro */
     .financial-box { border: 1px solid #333; background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
@@ -68,10 +66,9 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Pro Analyst v7.2")
+    st.caption("Pro Analyst v7.3")
     st.divider()
     st.success("Financial Dashboard Ativo")
-    st.info("Agora você tem controle total sobre o investimento e o troco calculado.")
     with st.expander("Legenda"):
         st.markdown("<div class='loto-ball ball-normal'>01</div> Sugerido<br><div class='loto-ball ball-fixed'>10</div> Fixo", unsafe_allow_html=True)
 
@@ -91,7 +88,7 @@ for i, jogo in enumerate(jogos):
             
             if df is not None:
                 c1, c2 = st.columns([2, 1])
-                with c1: st.markdown(f"Estratégia Vencedora: <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
+                with c1: st.markdown(f"Estratégia: <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
                 with c2: st.caption(f"Score: {score_total} acertos (12 jogos)")
 
                 tab_backtest, tab_orc, tab_filtros, tab_gerador = st.tabs(["📊 Auditoria", "💰 Budget", "⚙️ Filtros", "🎲 Mesa de Análise"])
@@ -100,45 +97,29 @@ for i, jogo in enumerate(jogos):
                     st.caption("Performance acumulada nos últimos 12 concursos:")
                     if placar_dict:
                         df_placar = pd.DataFrame(list(placar_dict.items()), columns=['Modelo', 'Total Acertos'])
-                        df_placar['Média/Jogo'] = (df_placar['Total Acertos'] / 12).round(2)
                         df_placar = df_placar.sort_values(by='Total Acertos', ascending=False)
                         st.dataframe(df_placar, hide_index=True, use_container_width=True)
 
-                # --- MUDANÇA PRINCIPAL AQUI (RESUMO FINANCEIRO) ---
                 with tab_orc:
                     orcamento = st.number_input("Investimento Máximo (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
-                    
                     if st.button("CALCULAR ESTRATÉGIA", key=f"btn_{jogo}", use_container_width=True):
                         res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
                         if "erro" not in res:
                             st.session_state[f'res_{jogo}'] = res
                             st.session_state[f'modelo_{jogo}'] = vencedor
                             
-                            # CÁLCULOS DO RESUMO FINANCEIRO
                             total_gasto = sum([item['custo_total'] for item in res['carrinho']])
                             total_volantes = sum([item['qtd_volantes'] for item in res['carrinho']])
                             troco = res['sobra']
                             
-                            st.success(f"Estratégia Otimizada com Sucesso!")
-                            
-                            # DASHBOARD FINANCEIRO
                             st.markdown("<div class='financial-box'>", unsafe_allow_html=True)
                             col_f1, col_f2, col_f3 = st.columns(3)
-                            col_f1.metric("Investimento Real", f"R$ {total_gasto:.2f}")
-                            col_f2.metric("Troco (Sobra)", f"R$ {troco:.2f}")
-                            col_f3.metric("Total de Jogos", f"{total_volantes}")
+                            col_f1.metric("Investimento", f"R$ {total_gasto:.2f}")
+                            col_f2.metric("Troco", f"R$ {troco:.2f}")
+                            col_f3.metric("Jogos", f"{total_volantes}")
                             st.markdown("</div>", unsafe_allow_html=True)
                             
-                            st.markdown("---")
-                            st.caption("Detalhamento do Carrinho:")
-                            
-                            # Tabela de Detalhamento
-                            if res['carrinho']:
-                                df_cart = pd.DataFrame(res['carrinho'])
-                                df_cart = df_cart[['qtd_volantes', 'dezenas', 'custo_total']]
-                                df_cart.columns = ['Qtd', 'Dezenas', 'Custo (R$)']
-                                st.dataframe(df_cart, hide_index=True, use_container_width=True)
-                                
+                            st.success(f"Estratégia Otimizada!")
                         else: st.error(res['erro'])
 
                 with tab_filtros:
@@ -155,7 +136,7 @@ for i, jogo in enumerate(jogos):
                         filtros = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
                         dados_exportacao = []
                         
-                        st.markdown(f"**Estratégia:** {modelo_ativo} (Determinístico)")
+                        st.markdown(f"**Modelo:** {modelo_ativo}")
                         global_idx = 0
                         
                         for item in res['carrinho']:
@@ -180,4 +161,19 @@ for i, jogo in enumerate(jogos):
                                 stats_txt = calcular_stats(p)
                                 score_eq = calcular_score_visual(p, q_dez)
                                 
-                                c_v
+                                c_v, c_i = st.columns([3, 1])
+                                with c_v: st.markdown(html_balls, unsafe_allow_html=True)
+                                with c_i:
+                                    st.progress(score_eq, text="Equilíbrio")
+                                    st.markdown(f"<div class='stat-box'>{stats_txt}</div>", unsafe_allow_html=True)
+                                
+                                dados_exportacao.append({"Jogo": global_idx, "Dezenas": p, "Modelo": modelo_ativo})
+                            st.divider()
+                        
+                        c1, c2 = st.columns(2)
+                        if dados_exportacao:
+                            txt = "\n".join([f"Jogo {d['Jogo']}: {d['Dezenas']}" for d in dados_exportacao])
+                            c1.download_button("📄 TXT", txt, f"{jogo}.txt")
+                            c2.download_button("📊 CSV", to_csv(dados_exportacao), f"{jogo}.csv", "text/csv")
+                    else: st.info("Calcule o orçamento primeiro.")
+            else: st.warning("Aguardando dados...")
