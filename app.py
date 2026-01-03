@@ -25,6 +25,17 @@ st.markdown("""
         align-items: center;
     }
     
+    /* Índice do Jogo (#01, #02...) */
+    .game-index {
+        font-family: 'Courier New', monospace;
+        color: #00FF99;
+        font-size: 16px;
+        font-weight: bold;
+        margin-right: 10px;
+        vertical-align: middle;
+        display: inline-block;
+    }
+    
     /* Bolas de Lotaria - Base */
     .loto-ball { 
         display: inline-flex;
@@ -34,27 +45,31 @@ st.markdown("""
         height: 35px;
         border-radius: 50%;
         font-weight: bold;
-        color: #FFF; /* Texto Branco */
+        color: #FFF; 
         margin: 2px;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
         font-size: 14px;
+        vertical-align: middle;
     }
     
-    /* --- A MUDANÇA DE COR ESTÁ AQUI --- */
+    /* Cores das Bolas */
     .ball-normal { 
-        background: radial-gradient(circle at 10px 10px, #a855f7, #581c87); /* Gradiente Roxo */
-        border: 1px solid #c084fc; /* Borda Roxa Clara */
+        background: radial-gradient(circle at 10px 10px, #a855f7, #581c87); /* Roxo */
+        border: 1px solid #c084fc; 
     }
     
-    /* Mantivemos os fixos em verde para destaque */
-    .ball-fixed { background: radial-gradient(circle at 10px 10px, #00FF99, #008f55); color: #000; border: 1px solid #00FF99; }
+    .ball-fixed { 
+        background: radial-gradient(circle at 10px 10px, #00FF99, #008f55); /* Verde */
+        color: #000; 
+        border: 1px solid #00FF99; 
+    }
     
     /* Tags e Stats */
     .winner-tag { background-color: #00FF99; color: black; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 12px; }
     .stat-box { font-size: 11px; color: #aaa; background: #1f2937; padding: 4px 8px; border-radius: 4px; margin-top: 5px; display: inline-block; }
     
     /* Barra de Progresso Custom */
-    .stProgress > div > div > div > div { background-color: #a855f7; } /* Barra Roxa também */
+    .stProgress > div > div > div > div { background-color: #a855f7; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -69,12 +84,10 @@ def get_data_and_backtest(jogo_key):
         
         for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
         
-        # Dados para Filtros
         todas = df.head(50)[cols].values.flatten()
         todas = todas[~np.isnan(todas)]
         freq = pd.Series(todas).value_counts().sort_values(ascending=False)
         
-        # Backtest
         vencedor, score, placar = MotorInferencia.executar_backtest(df, cols)
         
         return df, cols, vencedor, placar, freq
@@ -87,7 +100,6 @@ def calcular_stats(p):
     return f"P:{pares} Í:{len(p)-pares} | Σ:{soma}"
 
 def calcular_score_visual(p, total_dezenas):
-    """Calcula um score simples para barra de progresso (equilíbrio)"""
     if len(p) == 0: return 0
     pares = len([x for x in p if x % 2 == 0])
     ratio = pares / len(p)
@@ -96,7 +108,6 @@ def calcular_score_visual(p, total_dezenas):
     return score
 
 def to_csv(lista_jogos):
-    """Converte lista de jogos para CSV"""
     output = BytesIO()
     df = pd.DataFrame(lista_jogos)
     df_clean = df.drop(columns=['Dezenas'])
@@ -107,7 +118,7 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Pro Analyst v5.1 (Purple)")
+    st.caption("Pro Analyst v5.2")
     st.divider()
     st.info("Sistema de Análise Híbrida Ativo.")
     
@@ -127,28 +138,23 @@ cols_layout = st.columns(2)
 for i, jogo in enumerate(jogos):
     with cols_layout[i % 2]:
         with st.container(border=True):
-            # Header Customizado
             st.markdown(f"""
             <div class='card-header'>
                 <span>{jogo.replace('_', ' ')}</span>
             </div>
             """, unsafe_allow_html=True)
             
-            # 1. Processamento e Backtest
             df, cols_dezenas, vencedor, placar, freq = get_data_and_backtest(jogo)
             
             if df is not None:
-                # Placar do Backtest Compacto
                 c1, c2 = st.columns([2, 1])
                 with c1:
-                    st.markdown(f"Modelo Vencedor (Hoje): <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
+                    st.markdown(f"Modelo Vencedor: <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
                 with c2:
                     st.caption(f"Score Backtest: {placar[vencedor]} acertos")
 
-                # --- SISTEMA DE ABAS ---
                 tab_orc, tab_filtros, tab_gerador = st.tabs(["💰 Budget", "⚙️ Filtros", "🎲 Mesa de Análise"])
                 
-                # ABA 1: ORÇAMENTO
                 with tab_orc:
                     orcamento = st.number_input("Investimento (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
                     if st.button("CALCULAR ESTRATÉGIA", key=f"btn_{jogo}", use_container_width=True):
@@ -160,10 +166,8 @@ for i, jogo in enumerate(jogos):
                         else:
                             st.error(res['erro'])
 
-                # ABA 2: FILTROS VISUAIS
                 with tab_filtros:
                     if freq is not None:
-                        # Heatmap Horizontal (Mudado para roxo também)
                         st.caption("Top 10 Dezenas Mais Frequentes")
                         st.bar_chart(freq.head(10), height=120, color="#a855f7")
                         
@@ -173,7 +177,6 @@ for i, jogo in enumerate(jogos):
                         
                         st.session_state[f'filtros_{jogo}'] = {'fixos': fixos, 'excluidos': excluidos}
 
-                # ABA 3: GERADOR VISUAL (Bolas Roxas)
                 with tab_gerador:
                     if f'res_{jogo}' in st.session_state:
                         res = st.session_state[f'res_{jogo}']
@@ -181,7 +184,6 @@ for i, jogo in enumerate(jogos):
                         filtros = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
                         
                         dados_exportacao = []
-                        
                         st.markdown(f"**Estratégia Ativa:** {modelo_ativo}")
                         
                         for item in res['carrinho']:
@@ -190,7 +192,6 @@ for i, jogo in enumerate(jogos):
                             
                             st.markdown(f"👉 **{q_vol}x** Jogos de **{q_dez}** dezenas:")
                             
-                            # Gera os palpites
                             palpites_gerados = []
                             for _ in range(q_vol):
                                 p = MotorInferencia.prever_proximo(
@@ -199,25 +200,23 @@ for i, jogo in enumerate(jogos):
                                 )
                                 palpites_gerados.append(p)
                             
-                            # Renderiza cada jogo
+                            # RENDERIZAÇÃO COM NUMERAÇÃO
                             for idx, p in enumerate(palpites_gerados):
-                                html_balls = ""
+                                # Adiciona o número do jogo (#01, #02...)
+                                html_balls = f"<span class='game-index'>#{idx+1:02d}</span>"
+                                
                                 for n in p:
                                     n_str = str(int(n)).zfill(2)
-                                    # Define a cor da bola
                                     css_class = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
                                     html_balls += f"<div class='loto-ball {css_class}'>{n_str}</div>"
                                 
-                                # Stats e Score
                                 stats_txt = calcular_stats(p)
                                 score_eq = calcular_score_visual(p, q_dez)
                                 
-                                # Layout da Linha do Jogo
                                 col_visual, col_info = st.columns([3, 1])
                                 with col_visual:
                                     st.markdown(html_balls, unsafe_allow_html=True)
                                 with col_info:
-                                    # Barra de progresso roxa
                                     st.progress(score_eq, text="Equilíbrio")
                                     st.markdown(f"<div class='stat-box'>{stats_txt}</div>", unsafe_allow_html=True)
                                 
@@ -231,7 +230,6 @@ for i, jogo in enumerate(jogos):
                             
                             st.divider()
                         
-                        # --- ÁREA DE DOWNLOAD ---
                         c_dl1, c_dl2 = st.columns(2)
                         if dados_exportacao:
                             txt_data = "\n".join([f"Jogo {d['Jogo']}: {d['Dezenas']}" for d in dados_exportacao])
