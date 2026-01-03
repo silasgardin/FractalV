@@ -93,7 +93,7 @@ def gerar_palpites_inteligentes(qtd_jogos, qtd_dezenas_por_jogo, frequencia, mod
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("AI Analyst Module v2.1")
+    st.caption("AI Analyst Module v2.2")
     st.divider()
     
     # Conexão IA
@@ -101,14 +101,15 @@ with st.sidebar:
         st.success("IA Gemini: CONECTADO 🟢")
         try:
             genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            model = genai.GenerativeModel('gemini-pro')
+            # --- ATUALIZAÇÃO DO MODELO AQUI ---
+            model = genai.GenerativeModel('gemini-1.5-flash')
         except:
             model = None
     else:
         st.warning("IA Gemini: OFF 🟠")
         model = None
     
-    st.info("A geração de gráficos foi removida para priorizar a análise textual dos números.")
+    st.info("Usando modelo Gemini 1.5 Flash (Alta Velocidade)")
 
 # --- 5. PAINEL PRINCIPAL ---
 st.title("Painel de Controle Estratégico")
@@ -135,7 +136,7 @@ for i, jogo in enumerate(jogos):
                 c1.metric("Hurst", f"{hurst:.2f}")
                 c2.info(f"Modo: **{modo}**")
                 
-                # --- NOVO SISTEMA DE ABAS (Simplificado: Sem Gráfico) ---
+                # --- SISTEMA DE ABAS ---
                 tab1, tab2 = st.tabs(["💰 Estratégia (Budget)", "🧠 Palpites & Análise IA"])
                 
                 # ABA 1: ORÇAMENTO
@@ -149,7 +150,7 @@ for i, jogo in enumerate(jogos):
                             # Salva tudo no estado para a próxima aba
                             st.session_state[f'res_{jogo}'] = res
                             st.session_state[f'hurst_{jogo}'] = (hurst, modo)
-                            st.success("Cálculo Realizado! Vá para a aba 'Palpites' para ver os números.")
+                            st.success("Cálculo Realizado! Vá para a aba 'Palpites'.")
                         else:
                             st.error(res['erro'])
 
