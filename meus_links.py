@@ -1,6 +1,4 @@
 # meus_links.py
-# Este arquivo guarda SÓ os links. Você não precisa mexer nele quando atualizar o código.
-
 # Link da aba de Preços
 LINK_PRECOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHPmYqIsBMWIzdMlnuKfPDI5BI4UG_WMEdMP6OwUeojDThvp0fI6J7fywO_T7ynVsk30-JuhJJQng6/pub?gid=1620341582&single=true&output=csv"
 
