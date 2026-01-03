@@ -129,7 +129,7 @@ with st.sidebar:
         """, unsafe_allow_html=True)
 
 # --- 5. PAINEL PRINCIPAL ---
-st.title("Painel Estratégico de Lotarias")
+st.title("Painel Estratégico")
 
 otimizador = OtimizadorFinanceiro(LINKS_CSV.get("VALORES"))
 jogos = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
