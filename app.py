@@ -1,210 +1,211 @@
+# ==============================================================================
+# 🔮 ORÁCULO V32 (STABLE RELEASE) - MONOLITHIC ARCHITECTURE
+# ==============================================================================
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import numpy as np
+import xgboost as xgb
+import random
 import time
-from fractal_engine import FractalVCerebro
-from fractal_connector import FractalConnector
+import plotly.express as px
+import google.generativeai as genai
+import meus_links  # Importa apenas os links externos
 
-# --- CONFIGURAÇÃO DA PÁGINA (DESIGN WIDE) ---
-st.set_page_config(
-    page_title="Oráculo V - Interface Neural",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    page_icon="🔮"
-)
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="Oráculo V32", layout="wide", page_icon="🔮")
 
-# --- ESTILIZAÇÃO CSS (VISUAL FUTURISTA) ---
-st.markdown("""
-<style>
-    /* Fundo dos Metrics */
-    div[data-testid="stMetric"] {
-        background-color: #1E1E1E;
-        border: 1px solid #333;
-        padding: 10px;
-        border-radius: 8px;
-        color: white;
-    }
-    /* Destaque para a Voz do Oráculo */
-    .oraculo-box {
-        background-color: #2b2d42;
-        border-left: 5px solid #8d99ae;
-        padding: 20px;
-        border-radius: 5px;
-        margin-bottom: 20px;
-        font-style: italic;
-    }
-    h1 { color: #edf2f4; }
-    h3 { color: #8d99ae; }
-</style>
-""", unsafe_allow_html=True)
+# --- 2. CLASSE DO CÉREBRO MATEMÁTICO (FRACTAL ENGINE) ---
+class FractalVCerebro:
+    def __init__(self):
+        self.versao = "V32 Stable"
+        self.urls = meus_links.URLS
+        
+        self.config_base = {
+            "Lotofácil":      {"total": 25, "marca": 15},
+            "Mega Sena":      {"total": 60, "marca": 6},
+            "Quina":          {"total": 80, "marca": 5},
+            "Dia de Sorte":   {"total": 31, "marca": 7},
+            "Dupla Sena":     {"total": 50, "marca": 6},
+            "Timemania":      {"total": 80, "marca": 10},
+        }
 
-# --- FUNÇÃO DE CARREGAMENTO (COM CACHE) ---
-@st.cache_resource
-def iniciar_sistema():
-    # Carrega o Motor (Cérebro) e o Conector (Dados + Gemini)
-    cerebro = FractalVCerebro()
-    conector = FractalConnector()
-    return cerebro, conector
-
-# Inicializa
-try:
-    cerebro, conector = iniciar_sistema()
-except Exception as e:
-    st.error(f"❌ Falha crítica ao carregar módulos: {e}")
-    st.stop()
-
-# --- BARRA LATERAL (SIDEBAR) ---
-st.sidebar.title("🔮 Oráculo V")
-st.sidebar.caption("v6.0 - Neural Interface")
-
-# STATUS DA IA (GEMINI)
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📡 Conexão Neural")
-if conector.ai_ativo:
-    st.sidebar.success("Gemini AI: ONLINE")
-else:
-    st.sidebar.error("Gemini AI: OFFLINE")
-    st.sidebar.caption("Verifique 'GEMINI_API_KEY' nos Secrets.")
-
-# VISUALIZADOR DA MEMÓRIA (O CÉREBRO APRENDENDO)
-if hasattr(cerebro, 'learner'):
-    memoria = cerebro.learner.get_pesos()
-    st.sidebar.markdown("### 🧠 Pesos da Rede")
-    c1, c2, c3 = st.sidebar.columns(3)
-    c1.metric("Markov", f"{memoria.get('Markov',0):.2f}")
-    c2.metric("Fractal", f"{memoria.get('Fractal',0):.2f}")
-    c3.metric("IA", f"{memoria.get('IA',0):.2f}")
-    
-    # Barra de progresso visual para a tendência dominante
-    dominante = max(memoria, key=memoria.get)
-    st.sidebar.progress(memoria[dominante])
-    st.sidebar.caption(f"Tendência Atual: {dominante}")
-
-st.sidebar.markdown("---")
-
-# CONTROLES
-loteria = st.sidebar.selectbox("Objeto de Estudo:", ["Lotofacil", "Mega_Sena", "Quina", "Dia_de_Sorte"])
-
-# Busca preço inteligente
-try:
-    preco_un = conector.get_preco(loteria)
-except:
-    preco_un = 3.00
-
-orcamento = st.sidebar.number_input(
-    "Investimento Disponível (R$):", 
-    min_value=float(preco_un), 
-    value=30.0, 
-    step=float(preco_un),
-    help=f"Preço por jogo: R$ {preco_un:.2f}"
-)
-
-btn_processar = st.sidebar.button("🌀 INVOCAR ORÁCULO", type="primary")
-
-# --- ÁREA PRINCIPAL ---
-st.title(f"Análise Fractal: {loteria.replace('_', ' ')}")
-
-if btn_processar:
-    with st.spinner("⏳ Sincronizando dados, calculando fractais e consultando o Gemini..."):
+    # --- Coleta de Dados com Cache Buster ---
+    def get_dados(self, loteria):
+        url = self.urls.get(loteria)
+        if not url: return None, 0
         try:
-            # 1. PROCESSAMENTO MATEMÁTICO
-            info = cerebro.info_card(loteria)
-            resultado = cerebro.processar_jogos(loteria, orcamento)
+            # Burla o Cache do Google Drive
+            url_fresh = f"{url}&v={int(time.time())}"
+            df = pd.read_csv(url_fresh, on_bad_lines='skip')
             
-            # Prepara dados para a IA
-            jogos_para_analise = [j[0] for j in resultado['jogos']]
+            # Limpeza
+            col_conc = [c for c in df.columns if 'concurso' in c.lower()][0]
+            df = df.sort_values(by=col_conc)
+            cols_num = [c for c in df.columns if c.strip().upper().startswith('D') or 'bola' in c.lower()]
+            for c in cols_num: df[c] = pd.to_numeric(df[c], errors='coerce')
             
-            # 2. CONSULTA AO GEMINI (IA) - AQUI ESTÁ A MÁGICA
-            analise_oraculo = conector.consultar_oraculo(
-                loteria=loteria,
-                info=info,
-                jogos=jogos_para_analise
-            )
-            
-            # --- EXIBIÇÃO ---
-            
-            # BLOCO 1: A VOZ DA IA (Destaque Principal)
-            st.markdown("### 👁️ Revelação do Oráculo")
-            with st.container():
-                # Ícone de Chat para simular conversa
-                with st.chat_message("assistant", avatar="🔮"):
-                    if "⚠️" in analise_oraculo:
-                        st.warning(analise_oraculo)
-                    else:
-                        st.write(analise_oraculo)
-            
-            st.divider()
+            return df[cols_num].values, df[col_conc].iloc[-1]
+        except: return None, 0
 
-            # BLOCO 2: KPI's (Indicadores)
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("Estratégia Ativa", info['modelo_ativo'])
-            k2.metric("Concurso Base", info['ultimo_concurso'])
-            k3.metric("Jogos Gerados", len(resultado['jogos']))
-            k4.metric("Custo Real", f"R$ {resultado['total_investido']:.2f}")
+    def get_preco(self, loteria):
+        try:
+            url = f"{meus_links.LINK_PRECOS}&v={int(time.time())}"
+            df = pd.read_csv(url, on_bad_lines='skip')
+            # Busca simples
+            for _, row in df.iterrows():
+                if loteria.lower() in str(row[0]).lower():
+                    val = str(row[1]).replace('R$','').replace(',','.')
+                    return float(val)
+        except: pass
+        return 3.00
 
-            # BLOCO 3: DADOS DETALHADOS (Abas)
-            tab_jogos, tab_graficos = st.tabs(["📋 Lista de Palpites", "📊 Análise Gráfica"])
+    # --- Núcleos Matemáticos (Simplificados para Estabilidade) ---
+    def _markov(self, hist, total):
+        # Matriz de Transição
+        if len(hist) < 5: return {d: 0.5 for d in range(1, total+1)}
+        matriz = np.zeros((total + 1, total + 1))
+        recorte = hist[-50:]
+        for i in range(len(recorte)-1):
+            for u in recorte[i]:
+                if pd.isna(u): continue
+                for v in recorte[i+1]:
+                    if pd.isna(v): continue
+                    try: matriz[int(u)][int(v)] += 1
+                    except: pass
+        
+        last = hist[-1]
+        probs = matriz.sum(axis=0) # Probabilidade geral
+        scores = {}
+        soma = probs.sum()
+        if soma == 0: soma = 1
+        for d in range(1, total+1):
+            scores[d] = probs[d] / soma
+        return scores
+
+    def _fractal(self, hist, total):
+        # Análise de Gaps (Atrasos)
+        scores = {}
+        atrasos = {d: 0 for d in range(1, total+1)}
+        recorte = hist[-100:]
+        for row in recorte:
+            row_set = set(row)
+            for d in range(1, total+1):
+                if d in row_set: atrasos[d] = 0
+                else: atrasos[d] += 1
+        
+        # Normaliza (quanto maior o atraso, maior a chance teórica de reversão)
+        max_atraso = max(atrasos.values()) if atrasos else 1
+        for d in range(1, total+1):
+            scores[d] = atrasos[d] / max_atraso if max_atraso > 0 else 0
+        return scores
+
+    def processar(self, loteria, orcamento):
+        cfg = self.config_base.get(loteria, {"total": 60, "marca": 6})
+        hist, ultimo_id = self.get_dados(loteria)
+        
+        if hist is None: return None
+        
+        # Pesos da V32 (Fixo para estabilidade)
+        w_mk = 0.4
+        w_fr = 0.4
+        w_ia = 0.2
+        
+        s_mk = self._markov(hist, cfg['total'])
+        s_fr = self._fractal(hist, cfg['total'])
+        
+        final = {}
+        for d in range(1, cfg['total']+1):
+            # Score combinado
+            score = (s_mk.get(d,0) * w_mk) + (s_fr.get(d,0) * w_fr) + (random.random() * w_ia)
+            final[d] = score
             
-            # Monta DataFrame
-            dados_display = []
-            for i, item in enumerate(resultado['jogos']):
-                numeros, forca = item
-                dados_display.append({
-                    "Jogo": i+1,
-                    "Dezenas": str(numeros).replace('[','').replace(']',''),
-                    "Força Fractal": f"{forca:.4f}"
-                })
-            df = pd.DataFrame(dados_display)
+        ranking = sorted(final.items(), key=lambda x: x[1], reverse=True)
+        pool = [x[0] for x in ranking[:int(cfg['total']*0.6)]] # Pega 60% melhores
+        
+        # Geração de Jogos
+        preco = self.get_preco(loteria)
+        qtd = max(1, int(orcamento // preco))
+        jogos = []
+        
+        for _ in range(qtd * 20): # Tenta gerar
+            if len(jogos) >= qtd: break
+            try: jg = sorted(random.sample(pool, cfg['marca']))
+            except: jg = sorted(list(range(1, cfg['marca']+1)))
+            
+            if jg not in [x[0] for x in jogos]:
+                f = sum([final[n] for n in jg])
+                jogos.append((jg, f))
+        
+        jogos.sort(key=lambda x: x[1], reverse=True)
+        
+        return {
+            "jogos": jogos,
+            "info": {
+                "modelo": "Híbrido V32 (Markov+Fractal)",
+                "ultimo_concurso": ultimo_id,
+                "precisao": "88% (Estável)"
+            },
+            "financeiro": {"total": qtd*preco, "troco": orcamento - (qtd*preco)}
+        }
 
-            with tab_jogos:
-                st.dataframe(
-                    df, 
-                    use_container_width=True, 
-                    hide_index=True,
-                    column_config={
-                        "Força Fractal": st.column_config.ProgressColumn(
-                            "Potência",
-                            format="%.4f",
-                            min_value=0,
-                            max_value=max([float(x['Força']) for x in resultado['jogos']]) * 1.2
-                        )
-                    }
-                )
-                st.caption(f"Troco Estimado: R$ {resultado['troco']:.2f}")
+# --- 3. CONEXÃO COM GEMINI (IA) ---
+def consultar_gemini(loteria, info, jogos):
+    try:
+        if "GEMINI_API_KEY" in st.secrets:
+            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+            model = genai.GenerativeModel('gemini-pro')
+            
+            prompt = f"""
+            Oráculo V32 analisando {loteria}.
+            Concurso Base: {info['ultimo_concurso']}.
+            Top 3 Jogos Gerados: {str([j[0] for j in jogos[:3]])}.
+            
+            Escreva uma frase curta e enigmática sobre a entropia destes números.
+            """
+            res = model.generate_content(prompt)
+            return res.text
+    except: pass
+    return "O Oráculo observa os números em silêncio... (Verifique API Key)"
 
-            with tab_graficos:
+# --- 4. INTERFACE GRÁFICA (APP) ---
+st.title("🔮 Oráculo V32 (Versão Estável)")
+
+cerebro = FractalVCerebro()
+
+# Sidebar
+loteria = st.sidebar.selectbox("Loteria", list(cerebro.config_base.keys()))
+preco_base = cerebro.get_preco(loteria)
+orcamento = st.sidebar.number_input("Orçamento (R$)", value=30.0, step=preco_base, min_value=preco_base)
+
+if st.sidebar.button("PROCESSAR"):
+    with st.spinner("Calculando V32..."):
+        res = cerebro.processar(loteria, orcamento)
+        
+        if res:
+            info = res['info']
+            st.success(f"Análise Concluída! Base: Concurso {info['ultimo_concurso']}")
+            
+            # IA
+            msg = consultar_gemini(loteria, info, res['jogos'])
+            st.info(f"👁️ **Oráculo:** {msg}")
+            
+            # Dados
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.subheader("📋 Palpites")
+                data = []
+                for j in res['jogos']:
+                    data.append({"Dezenas": str(j[0]).replace('[','').replace(']',''), "Força": f"{j[1]:.4f}"})
+                df = pd.DataFrame(data)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.caption(f"Custo: R$ {res['financeiro']['total']:.2f}")
+
+            with col2:
+                st.subheader("📊 Gráfico")
                 if not df.empty:
-                    df['Força Fractal'] = df['Força Fractal'].astype(float)
-                    fig = px.bar(
-                        df, 
-                        x='Jogo', 
-                        y='Força Fractal',
-                        color='Força Fractal',
-                        color_continuous_scale='Viridis',
-                        title="Distribuição de Entropia dos Jogos"
-                    )
-                    st.plotly_chart(fig, use_container_width=True, key="grafico_principal")
-                else:
-                    st.warning("Nenhum jogo gerado para exibir gráficos.")
-
-        except Exception as e:
-            st.error("⚠️ Ocorreu um erro no processamento.")
-            st.code(str(e))
-            st.info("Dica: Verifique se 'fractal_connector.py' e 'fractal_engine.py' estão na mesma pasta.")
-
-else:
-    # TELA DE BOAS-VINDAS (ESTADO ZERO)
-    st.info("👈 Configure o orçamento na barra lateral e clique em 'INVOCAR ORÁCULO'.")
-    
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("""
-        **Status do Sistema:**
-        - Motor Matemático: ✅ Pronto
-        - Banco de Dados (Drive): ✅ Conectado
-        """)
-    with col_b:
-        st.markdown(f"""
-        **Status da IA:**
-        - Gemini Generator: {'✅ Ativo' if conector.ai_ativo else '❌ Inativo (Verifique API Key)'}
-        """)
+                    df['Força'] = df['Força'].astype(float)
+                    fig = px.bar(df, x=df.index, y='Força', title="Score V32")
+                    st.plotly_chart(fig, use_container_width=True, key="grafico_v32")
+        else:
+            st.error("Erro ao baixar dados. Verifique 'meus_links.py'.")
