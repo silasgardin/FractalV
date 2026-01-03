@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from io import StringIO
 from motor_matematico import OtimizadorFinanceiro, MotorFractal
 from links_planilhas import LINKS_CSV
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="FRACTALV | Core", layout="wide", page_icon="🧩")
+st.set_page_config(page_title="FRACTALV | Pro Tools", layout="wide", page_icon="🧩")
 
 # --- 2. CSS PERSONALIZADO ---
 st.markdown("""
@@ -17,7 +18,10 @@ st.markdown("""
         background: #262730; padding: 4px 8px; border-radius: 4px; 
         border: 1px solid #444; display: inline-block; margin: 2px;
     }
-    .metric-box { background: #1f2937; padding: 10px; border-radius: 5px; text-align: center; }
+    .stat-tag {
+        font-size: 12px; color: #aaa; background: #1f2937; 
+        padding: 2px 6px; border-radius: 3px; margin-left: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -30,18 +34,14 @@ def get_data(jogo_key):
         # Leitura tolerante a falhas
         df = pd.read_csv(link, decimal=",", thousands=".", on_bad_lines='skip')
         
-        # Filtra colunas D1, D2...
         cols = [c for c in df.columns if c.startswith('D') and '2º' not in c]
         if not cols: return None, None, None
         
-        # Garante numérico
         for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
         
-        # Série Temporal (Soma)
         df['Soma'] = df[cols].sum(axis=1)
         series = df.head(60)['Soma'].values
         
-        # Frequência (Quentes/Frios)
         todas_dezenas = df.head(50)[cols].values.flatten()
         todas_dezenas = todas_dezenas[~np.isnan(todas_dezenas)]
         frequencia = pd.Series(todas_dezenas).value_counts()
@@ -60,13 +60,10 @@ def gerar_palpites_inteligentes(qtd_jogos, qtd_dezenas_por_jogo, frequencia, mod
     
     # Pesos baseados no Hurst
     if "TENDÊNCIA" in modo_fractal:
-        # Prioriza números que estão saindo mais
-        pesos = np.linspace(1.0, 0.2, len(numeros_disponiveis))
+        pesos = np.linspace(1.0, 0.2, len(numeros_disponiveis)) # Prioriza quentes
     elif "REVERSÃO" in modo_fractal:
-        # Prioriza números atrasados
-        pesos = np.linspace(0.2, 1.0, len(numeros_disponiveis))
+        pesos = np.linspace(0.2, 1.0, len(numeros_disponiveis)) # Prioriza frios
     else:
-        # Aleatório puro
         pesos = np.ones(len(numeros_disponiveis)) 
         
     pesos = pesos / pesos.sum()
@@ -81,13 +78,26 @@ def gerar_palpites_inteligentes(qtd_jogos, qtd_dezenas_por_jogo, frequencia, mod
             
     return palpites
 
+def calcular_stats_jogo(dezenas):
+    """Retorna estatísticas rápidas do jogo gerado"""
+    pares = len([x for x in dezenas if x % 2 == 0])
+    impares = len(dezenas) - pares
+    soma = int(sum(dezenas))
+    return f"Pares: {pares} | Ímpares: {impares} | Soma: {soma}"
+
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Math Engine Only v3.0")
+    st.caption("Math Engine v3.1 (Tools)")
     st.divider()
     st.success("Sistema Operacional 🟢")
-    st.info("Modo de Performance Máxima ativado (IA Desativada).")
+    
+    with st.expander("ℹ️ Legenda Hurst"):
+        st.markdown("""
+        - **> 0.55 (Tendência):** Repete o padrão recente.
+        - **< 0.45 (Reversão):** Quebra o padrão (aposta no atrasado).
+        - **0.50 (Neutro):** Aleatório puro.
+        """)
 
 # --- 5. PAINEL PRINCIPAL ---
 st.title("Painel de Controle Estratégico")
@@ -112,14 +122,23 @@ for i, jogo in enumerate(jogos):
                 # Exibição dos Indicadores
                 c1, c2 = st.columns([1, 2])
                 c1.metric("Hurst", f"{hurst:.2f}")
-                c2.info(f"Modo: **{modo}**")
+                
+                # Badge visual de modo
+                if "TENDÊNCIA" in modo:
+                    c2.markdown("🔥 **Modo: TENDÊNCIA (Quentes)**")
+                    c2.caption("O mercado está repetindo padrões.")
+                elif "REVERSÃO" in modo:
+                    c2.markdown("🧊 **Modo: REVERSÃO (Frios)**")
+                    c2.caption("O mercado busca equilíbrio.")
+                else:
+                    c2.markdown("🎲 **Modo: ALEATÓRIO**")
                 
                 # 3. Abas de Operação
-                tab1, tab2 = st.tabs(["💰 Estratégia", "🎲 Palpites Gerados"])
+                tab1, tab2 = st.tabs(["💰 Estratégia", "🎲 Palpites & Exportação"])
                 
                 # Aba Financeira
                 with tab1:
-                    orcamento = st.number_input("Orçamento (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
+                    orcamento = st.number_input("Investimento (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
                     
                     if st.button("CALCULAR MELHOR ALOCAÇÃO", key=f"btn_{jogo}"):
                         res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
@@ -137,7 +156,11 @@ for i, jogo in enumerate(jogos):
                         res = st.session_state[f'res_{jogo}']
                         modo_atual = st.session_state[f'hurst_{jogo}'][1]
                         
-                        st.write(f"Distribuição Otimizada ({modo_atual}):")
+                        st.write(f"Distribuição: **{modo_atual}**")
+                        
+                        lista_para_txt = []
+                        lista_para_txt.append(f"=== PALPITES FRACTALV: {jogo} ===")
+                        lista_para_txt.append(f"Estratégia: {modo_atual} | Hurst: {hurst:.2f}\n")
                         
                         for item in res['carrinho']:
                             q_volantes = item['qtd_volantes']
@@ -145,16 +168,33 @@ for i, jogo in enumerate(jogos):
                             
                             st.markdown(f"👉 **{q_volantes}x** Jogos de **{q_dezenas}** dezenas:")
                             
-                            # Gera os números aqui
+                            # Gera os números
                             palpites = gerar_palpites_inteligentes(q_volantes, q_dezenas, freq, modo_atual)
                             
-                            for p in palpites:
+                            for idx, p in enumerate(palpites):
                                 # Formatação visual das bolinhas
                                 p_str = [str(int(n)).zfill(2) for n in p]
                                 html_nums = "".join([f"<span class='big-number'>{n}</span>" for n in p_str])
-                                st.markdown(html_nums, unsafe_allow_html=True)
+                                
+                                # Cálculo de estatísticas locais (Sem IA)
+                                stats = calcular_stats_jogo(p)
+                                
+                                st.markdown(f"{html_nums} <span class='stat-tag'>{stats}</span>", unsafe_allow_html=True)
+                                
+                                # Prepara texto para download
+                                lista_para_txt.append(f"Jogo {idx+1}: {', '.join(p_str)}")
                             
                             st.divider()
+                        
+                        # --- BOTÃO DE DOWNLOAD ---
+                        texto_final = "\n".join(lista_para_txt)
+                        st.download_button(
+                            label="📥 BAIXAR JOGOS (.txt)",
+                            data=texto_final,
+                            file_name=f"fractalv_{jogo.lower()}.txt",
+                            mime="text/plain",
+                            key=f"dl_{jogo}"
+                        )
                     else:
                         st.info("Defina o orçamento e clique em Calcular primeiro.")
             
