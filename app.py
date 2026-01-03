@@ -83,6 +83,7 @@ def calcular_stats(p):
 
 def calcular_score_visual(p, total_dezenas):
     """Calcula um score simples para barra de progresso (equilíbrio)"""
+    if len(p) == 0: return 0
     pares = len([x for x in p if x % 2 == 0])
     ratio = pares / len(p)
     # O ideal é 50% pares (0.5). Quanto mais longe, menor o score.
@@ -94,7 +95,11 @@ def to_csv(lista_jogos):
     """Converte lista de jogos para CSV"""
     output = BytesIO()
     df = pd.DataFrame(lista_jogos)
-    df.to_csv(output, index=False, sep=';')
+    # Remove coluna complexa de dezenas para o CSV ficar limpo
+    df_clean = df.drop(columns=['Dezenas'])
+    # Adiciona dezenas como string
+    df_clean['Dezenas'] = [", ".join(map(str, x)) for x in df['Dezenas']]
+    df_clean.to_csv(output, index=False, sep=';')
     return output.getvalue()
 
 # --- 4. SIDEBAR ---
@@ -108,7 +113,7 @@ with st.sidebar:
         st.markdown("""
         <div class='loto-ball ball-normal'>01</div> Normal (Matemático)<br>
         <div class='loto-ball ball-fixed'>10</div> Fixo (Obrigatório)<br>
-        <div class='loto-ball ball-hot'>59</div> Sugestão IA (Futuro)
+        <div class='loto-ball ball-hot'>59</div> Sugestão (Futuro)
         """, unsafe_allow_html=True)
 
 # --- 5. PAINEL PRINCIPAL ---
@@ -196,9 +201,50 @@ for i, jogo in enumerate(jogos):
                             
                             # Renderiza cada jogo
                             for idx, p in enumerate(palpites_gerados):
+                                # CORREÇÃO: AQUI ESTAVA O ERRO HTML_
                                 html_balls = ""
                                 for n in p:
                                     n_str = str(int(n)).zfill(2)
                                     # Estilo da bola
                                     css_class = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
-                                    html_
+                                    html_balls += f"<div class='loto-ball {css_class}'>{n_str}</div>"
+                                
+                                # Stats e Score
+                                stats_txt = calcular_stats(p)
+                                score_eq = calcular_score_visual(p, q_dez)
+                                
+                                # Layout da Linha do Jogo
+                                col_visual, col_info = st.columns([3, 1])
+                                with col_visual:
+                                    st.markdown(html_balls, unsafe_allow_html=True)
+                                with col_info:
+                                    st.progress(score_eq, text="Equilíbrio")
+                                    st.markdown(f"<div class='stat-box'>{stats_txt}</div>", unsafe_allow_html=True)
+                                
+                                # Adiciona para exportação
+                                dados_exportacao.append({
+                                    "Jogo": idx + 1,
+                                    "Dezenas": p,
+                                    "Pares": len([x for x in p if x % 2 == 0]),
+                                    "Soma": sum(p),
+                                    "Modelo": modelo_ativo
+                                })
+                            
+                            st.divider()
+                        
+                        # --- ÁREA DE DOWNLOAD ---
+                        c_dl1, c_dl2 = st.columns(2)
+                        
+                        # Download TXT (Simples)
+                        if dados_exportacao:
+                            txt_data = "\n".join([f"Jogo {d['Jogo']}: {d['Dezenas']}" for d in dados_exportacao])
+                            c_dl1.download_button("📄 Baixar Texto (.txt)", txt_data, f"{jogo}_fractalv.txt")
+                            
+                            # Download CSV (Excel)
+                            csv_data = to_csv(dados_exportacao)
+                            c_dl2.download_button("📊 Baixar Excel (.csv)", csv_data, f"{jogo}_fractalv.csv", "text/csv")
+                        
+                    else:
+                        st.info("⚠️ Vá à aba 'Budget' e clique em Calcular.")
+            else:
+                st.warning("Aguardando conexão...")
