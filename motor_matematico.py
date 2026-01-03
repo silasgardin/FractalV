@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import norm
 
 class OtimizadorFinanceiro:
-    """Gerencia o orçamento e a distribuição de apostas (Financial Management)"""
+    """Gerencia o orçamento e a distribuição de apostas"""
     def __init__(self, link_csv_valores):
         self.url = link_csv_valores
         self.df_precos = None
@@ -31,7 +30,6 @@ class OtimizadorFinanceiro:
         
         if tabela.empty: return {"erro": f"Jogo '{jogo}' não encontrado na tabela."}
 
-        # Ordena: Prioridade para jogos caros (Desdobramentos - Maior chance matemática)
         tabela = tabela.sort_values(by='Preço Total (R$)', ascending=False)
         estrategia = {"jogo": jogo, "orcamento_inicial": orcamento, "carrinho": [], "sobra": 0}
         saldo = orcamento
@@ -57,173 +55,143 @@ class OtimizadorFinanceiro:
 
 class MotorInferencia:
     """
-    O Cérebro Matemático que compete modelos entre si.
-    Modelos: Markov, Hurst, Gauss, Estocástico.
+    O Cérebro Matemático V5.0 - Compatível com Filtros Manuais
     """
     
     @staticmethod
     def executar_backtest(df_completo, cols_dezenas):
-        """
-        Testa qual modelo teria acertado mais no último sorteio.
-        """
+        """Testa qual modelo teria acertado mais no último sorteio."""
         try:
-            # Separa: Histórico (Passado) vs Alvo (Último sorteio real)
-            # df_treino = tudo menos a primeira linha (que é o último sorteio)
-            # df_teste = primeira linha (o resultado que queremos prever no backtest)
-            if len(df_completo) < 50: return "Padrão (Dados Insuficientes)", 0
+            if len(df_completo) < 50: return "Padrão (Dados Insuficientes)", 0, {}
             
             alvo_real = set(df_completo.iloc[0][cols_dezenas].dropna().astype(int).values)
             df_treino = df_completo.iloc[1:].copy()
+            qtd_alvo = len(alvo_real)
             
-            # --- MODELO 1: HURST (Tendência/Reversão) ---
-            palpite_hurst = MotorInferencia._gerar_palpite_hurst(df_treino, cols_dezenas, len(alvo_real))
-            acertos_hurst = len(alvo_real.intersection(palpite_hurst))
+            # Gera palpites SEM filtros para o teste puro
+            p_hurst = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Hurst")
+            p_markov = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Markov")
+            p_gauss = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Gauss")
+            p_stoch = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Estocástico")
             
-            # --- MODELO 2: MARKOV (Transição) ---
-            palpite_markov = MotorInferencia._gerar_palpite_markov(df_treino, cols_dezenas, len(alvo_real))
-            acertos_markov = len(alvo_real.intersection(palpite_markov))
-            
-            # --- MODELO 3: GAUSS (Distribuição Normal da Soma) ---
-            palpite_gauss = MotorInferencia._gerar_palpite_gauss(df_treino, cols_dezenas, len(alvo_real))
-            acertos_gauss = len(alvo_real.intersection(palpite_gauss))
-            
-            # --- MODELO 4: ESTOCÁSTICO (Oscilador) ---
-            palpite_stoch = MotorInferencia._gerar_palpite_estocastico(df_treino, cols_dezenas, len(alvo_real))
-            acertos_stoch = len(alvo_real.intersection(palpite_stoch))
-            
-            # Competição
             scores = {
-                "Hurst (Fractal)": acertos_hurst,
-                "Markov (Cadeias)": acertos_markov,
-                "Gauss (Normal)": acertos_gauss,
-                "Estocástico (Oscilador)": acertos_stoch
+                "Hurst (Fractal)": len(alvo_real.intersection(p_hurst)),
+                "Markov (Cadeias)": len(alvo_real.intersection(p_markov)),
+                "Gauss (Normal)": len(alvo_real.intersection(p_gauss)),
+                "Estocástico (Oscilador)": len(alvo_real.intersection(p_stoch))
             }
             
-            melhor_modelo = max(scores, key=scores.get)
-            melhor_score = scores[melhor_modelo]
-            
-            return melhor_modelo, melhor_score, scores
+            melhor = max(scores, key=scores.get)
+            return melhor, scores[melhor], scores
         except Exception as e:
-            # print(f"Erro Backtest: {e}")
             return "Padrão (Erro)", 0, {}
 
     @staticmethod
-    def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar):
-        """Gera os números para o PRÓXIMO sorteio usando o modelo vencedor"""
-        if "Hurst" in modelo_vencedor:
-            return MotorInferencia._gerar_palpite_hurst(df_completo, cols_dezenas, qtd_numeros_gerar)
-        elif "Markov" in modelo_vencedor:
-            return MotorInferencia._gerar_palpite_markov(df_completo, cols_dezenas, qtd_numeros_gerar)
-        elif "Gauss" in modelo_vencedor:
-            return MotorInferencia._gerar_palpite_gauss(df_completo, cols_dezenas, qtd_numeros_gerar)
-        elif "Estocástico" in modelo_vencedor:
-            return MotorInferencia._gerar_palpite_estocastico(df_completo, cols_dezenas, qtd_numeros_gerar)
-        else:
-            # Fallback: Frequência Simples
+    def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[]):
+        """
+        Gera números usando o modelo vencedor + Filtros do Usuário.
+        ATENÇÃO: Aceita argumentos 'fixos' e 'excluidos'.
+        """
+        
+        # 1. Identifica estratégia base
+        tipo = "Hurst"
+        if "Markov" in modelo_vencedor: tipo = "Markov"
+        elif "Gauss" in modelo_vencedor: tipo = "Gauss"
+        elif "Estocástico" in modelo_vencedor: tipo = "Estocástico"
+        
+        # 2. Calcula quantas vagas restam (Total - Fixos)
+        vagas_abertas = qtd_numeros_gerar - len(fixos)
+        
+        # Se o usuário fixou tudo, retorna os fixos
+        if vagas_abertas <= 0: 
+            return sorted(list(set(fixos))[:qtd_numeros_gerar])
+        
+        # 3. Gera candidatos em excesso (3x) para poder filtrar depois
+        candidatos_brutos = MotorInferencia._gerar_base(df_completo, cols_dezenas, qtd_numeros_gerar * 4, tipo)
+        
+        # 4. Aplica Filtros (Remove Excluídos e Fixos já presentes na lista bruta)
+        candidatos_validos = [n for n in candidatos_brutos if n not in excluidos and n not in fixos]
+        
+        # 5. Preenche as vagas
+        escolhidos = candidatos_validos[:vagas_abertas]
+        
+        # Se faltar número (porque filtramos demais), completa com a frequência geral
+        if len(escolhidos) < vagas_abertas:
             todas = df_completo.head(50)[cols_dezenas].values.flatten()
             todas = todas[~np.isnan(todas)]
-            freq = pd.Series(todas).value_counts()
-            top = freq.head(qtd_numeros_gerar).index.tolist()
-            return sorted([int(x) for x in top])
+            freq = pd.Series(todas).value_counts().index.tolist()
+            # Pega extras que não sejam excluídos nem fixos nem já escolhidos
+            extras = [n for n in freq if n not in excluidos and n not in fixos and n not in escolhidos]
+            falta = vagas_abertas - len(escolhidos)
+            escolhidos.extend(extras[:falta])
+            
+        resultado_final = list(set(escolhidos + fixos))
+        return sorted(resultado_final)
 
-    # --- LÓGICAS INTERNAS DOS MODELOS ---
-    
+    # --- MOTORES INTERNOS ---
     @staticmethod
-    def _gerar_palpite_hurst(df, cols, qtd):
-        # Calcula Hurst da Soma
-        somas = df[cols].sum(axis=1).head(60).values
-        hurst = MotorFractal.calcular_hurst(somas)
-        
+    def _gerar_base(df, cols, qtd, tipo):
         todas = df.head(50)[cols].values.flatten()
-        freq = pd.Series(todas[~np.isnan(todas)]).value_counts()
+        todas = todas[~np.isnan(todas)]
+        freq = pd.Series(todas).value_counts()
         numeros = freq.index.tolist()
         
-        if hurst > 0.55: # Tendência (Pega Quentes)
-            escolhidos = numeros[:qtd]
-        elif hurst < 0.45: # Reversão (Pega Frios/Atrasados)
-            escolhidos = numeros[-qtd:]
-        else: # Aleatório
+        if tipo == "Hurst":
+            somas = df[cols].sum(axis=1).head(60).values
+            try:
+                ts = np.array(somas)
+                lags = range(2, 20)
+                tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
+                poly = np.polyfit(np.log(lags), np.log(tau), 1)
+                h = poly[0] * 2.0
+            except: h = 0.5
+            
+            if h > 0.55: return set([int(x) for x in numeros[:qtd]]) # Quentes
+            elif h < 0.45: return set([int(x) for x in numeros[-qtd:]]) # Frios
+            else: 
+                import random
+                return set([int(x) for x in random.sample(numeros[:qtd*2], qtd)])
+
+        elif tipo == "Markov":
+            # Lógica simples de Markov de 1ª ordem
+            ultimo_sorteio = set(df.iloc[0][cols].dropna().values)
+            candidatos = []
+            for i in range(1, min(100, len(df)-1)):
+                jogo_passado = set(df.iloc[i][cols].dropna().values)
+                # Se coincidiu 2 ou mais números
+                if len(ultimo_sorteio.intersection(jogo_passado)) >= 2:
+                    # O que saiu DEPOIS?
+                    candidatos.extend(df.iloc[i-1][cols].dropna().values)
+            
+            if candidatos:
+                top = pd.Series(candidatos).value_counts().head(qtd).index.tolist()
+                return set([int(x) for x in top])
+            else:
+                return set([int(x) for x in numeros[:qtd]])
+
+        elif tipo == "Gauss":
+            somas = df[cols].sum(axis=1)
+            media = somas.mean()
             import random
-            escolhidos = random.sample(numeros[:qtd*2], qtd) # Sorteia entre os top 2x
-            
-        return set([int(x) for x in escolhidos])
+            for _ in range(50):
+                samp = random.sample(numeros[:qtd*3], qtd)
+                if abs(sum(samp) - media) < (media * 0.15):
+                    return set([int(x) for x in samp])
+            return set([int(x) for x in numeros[:qtd]])
 
-    @staticmethod
-    def _gerar_palpite_markov(df, cols, qtd):
-        # Lógica: Quais números saíram após os números do último sorteio (linha 0 do df de treino)
-        ultimo_sorteio = set(df.iloc[0][cols].dropna().values)
-        candidatos = []
-        
-        for i in range(1, len(df)-1):
-            jogo_passado = set(df.iloc[i][cols].dropna().values)
-            # Se o jogo passado se parece com o último (interseção > 3)
-            if len(ultimo_sorteio.intersection(jogo_passado)) >= 2:
-                # Pega o resultado SEGUINTE (que aconteceu depois dele)
-                candidatos.extend(df.iloc[i-1][cols].dropna().values)
-        
-        if not candidatos:
-            # Fallback se não achar padrão
-            return MotorInferencia._gerar_palpite_hurst(df, cols, qtd)
+        elif tipo == "Estocástico":
+            candidatos = []
+            for num in numeros:
+                recente = (df.head(10)[cols].values == num).sum()
+                if recente <= 1: candidatos.append(num) # Oversold
             
-        contagem = pd.Series(candidatos).value_counts()
-        top = contagem.head(qtd).index.tolist()
-        return set([int(x) for x in top])
-
-    @staticmethod
-    def _gerar_palpite_gauss(df, cols, qtd):
-        # Lógica: Gerar jogo cuja SOMA esteja próxima da média histórica (Topo do Sino de Gauss)
-        somas = df[cols].sum(axis=1)
-        media_ideal = somas.mean()
-        
-        todas = df.head(50)[cols].values.flatten()
-        freq = pd.Series(todas[~np.isnan(todas)]).value_counts()
-        disponiveis = freq.index.tolist()
-        
-        # Tenta montar um jogo greedy que se aproxime da média
-        escolhidos = []
-        soma_atual = 0
-        
-        # Pega números aleatórios ponderados pela frequência até atingir a soma
-        import random
-        attempts = 0
-        while attempts < 100:
-            candidatos = random.sample(disponiveis[:qtd*3], qtd)
-            if abs(sum(candidatos) - media_ideal) < (media_ideal * 0.1): # Margem de 10%
-                return set([int(x) for x in candidatos])
-            attempts += 1
+            if len(candidatos) < qtd: candidatos.extend(numeros)
+            return set([int(x) for x in candidatos[:qtd]])
             
-        return set([int(x) for x in disponiveis[:qtd]]) # Fallback
-
-    @staticmethod
-    def _gerar_palpite_estocastico(df, cols, qtd):
-        # Lógica: (Último - Min) / (Max - Min). Se < 0.2 (Oversold), deve sair.
-        todas = df.head(100)[cols].values.flatten()
-        freq = pd.Series(todas[~np.isnan(todas)]).value_counts()
-        
-        candidatos_fortes = []
-        for num in freq.index:
-            # Simula um oscilador simples de frequência recente vs total
-            freq_recente = (df.head(10)[cols].values == num).sum()
-            freq_total = freq[num] / 10.0 # Normaliza
-            
-            # Se apareceu pouco recentemente mas tem histórico alto (Oversold)
-            if freq_recente <= 1 and freq_total > 2:
-                candidatos_fortes.append(num)
-                
-        if len(candidatos_fortes) < qtd:
-            mais_frequentes = freq.index.tolist()
-            falta = qtd - len(candidatos_fortes)
-            candidatos_fortes.extend([x for x in mais_frequentes if x not in candidatos_fortes][:falta])
-            
-        return set([int(x) for x in candidatos_fortes[:qtd]])
+        return set([int(x) for x in numeros[:qtd]])
 
 class MotorFractal:
+    # Mantido para compatibilidade se necessário, mas a lógica agora está no Inferencia
     @staticmethod
-    def calcular_hurst(serie_numerica):
-        try:
-            ts = np.array(serie_numerica)
-            lags = range(2, 20)
-            tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
-            poly = np.polyfit(np.log(lags), np.log(tau), 1)
-            return poly[0] * 2.0
-        except: return 0.5
+    def diagnosticar_tendencia(serie):
+        return 0.5, "LEGACY", "Use MotorInferencia"
