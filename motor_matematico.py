@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 
 class OtimizadorFinanceiro:
-    """Gerencia o orçamento e a distribuição de apostas"""
     def __init__(self, link_csv_valores):
         self.url = link_csv_valores
         self.df_precos = None
@@ -55,12 +54,11 @@ class OtimizadorFinanceiro:
 
 class MotorInferencia:
     """
-    O Cérebro Matemático V5.0 - Compatível com Filtros Manuais
+    Cérebro Matemático V6.0 - Determinístico (Zero Oscilação)
     """
     
     @staticmethod
     def executar_backtest(df_completo, cols_dezenas):
-        """Testa qual modelo teria acertado mais no último sorteio."""
         try:
             if len(df_completo) < 50: return "Padrão (Dados Insuficientes)", 0, {}
             
@@ -68,11 +66,11 @@ class MotorInferencia:
             df_treino = df_completo.iloc[1:].copy()
             qtd_alvo = len(alvo_real)
             
-            # Gera palpites SEM filtros para o teste puro
-            p_hurst = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Hurst")
-            p_markov = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Markov")
-            p_gauss = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Gauss")
-            p_stoch = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Estocástico")
+            # Seed fixo para backtest (garante consistência no teste)
+            p_hurst = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Hurst", seed_offset=1)
+            p_markov = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Markov", seed_offset=1)
+            p_gauss = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Gauss", seed_offset=1)
+            p_stoch = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Estocástico", seed_offset=1)
             
             scores = {
                 "Hurst (Fractal)": len(alvo_real.intersection(p_hurst)),
@@ -87,40 +85,34 @@ class MotorInferencia:
             return "Padrão (Erro)", 0, {}
 
     @staticmethod
-    def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[]):
+    def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[], seed_index=0):
         """
-        Gera números usando o modelo vencedor + Filtros do Usuário.
-        ATENÇÃO: Este método aceita 'fixos' e 'excluidos' para corrigir o TypeError.
+        Gera números DETERMINÍSTICOS. 
+        seed_index: Número do volante (1, 2, 3...) para garantir variação entre jogos, 
+        mas consistência ao recalcular.
         """
         
-        # 1. Identifica estratégia base
         tipo = "Hurst"
         if "Markov" in modelo_vencedor: tipo = "Markov"
         elif "Gauss" in modelo_vencedor: tipo = "Gauss"
         elif "Estocástico" in modelo_vencedor: tipo = "Estocástico"
         
-        # 2. Calcula quantas vagas restam (Total - Fixos)
         vagas_abertas = qtd_numeros_gerar - len(fixos)
-        
-        # Se o usuário fixou tudo, retorna os fixos
         if vagas_abertas <= 0: 
             return sorted(list(set(fixos))[:qtd_numeros_gerar])
         
-        # 3. Gera candidatos em excesso (4x) para poder filtrar depois
-        candidatos_brutos = MotorInferencia._gerar_base(df_completo, cols_dezenas, qtd_numeros_gerar * 4, tipo)
+        # Gera candidatos brutos usando Seed
+        # Multiplicamos o seed_index para que o Jogo 1 seja bem diferente do Jogo 2
+        candidatos_brutos = MotorInferencia._gerar_base(df_completo, cols_dezenas, qtd_numeros_gerar * 5, tipo, seed_offset=seed_index)
         
-        # 4. Aplica Filtros (Remove Excluídos e Fixos já presentes na lista bruta)
         candidatos_validos = [n for n in candidatos_brutos if n not in excluidos and n not in fixos]
-        
-        # 5. Preenche as vagas
         escolhidos = candidatos_validos[:vagas_abertas]
         
-        # Se faltar número (porque filtramos demais), completa com a frequência geral
+        # Fallback determinístico
         if len(escolhidos) < vagas_abertas:
             todas = df_completo.head(50)[cols_dezenas].values.flatten()
             todas = todas[~np.isnan(todas)]
             freq = pd.Series(todas).value_counts().index.tolist()
-            # Pega extras que não sejam excluídos nem fixos nem já escolhidos
             extras = [n for n in freq if n not in excluidos and n not in fixos and n not in escolhidos]
             falta = vagas_abertas - len(escolhidos)
             escolhidos.extend(extras[:falta])
@@ -128,17 +120,29 @@ class MotorInferencia:
         resultado_final = list(set(escolhidos + fixos))
         return sorted(resultado_final)
 
-    # --- MOTORES INTERNOS ---
     @staticmethod
-    def _gerar_base(df, cols, qtd, tipo):
+    def _gerar_base(df, cols, qtd, tipo, seed_offset=0):
+        """
+        Geração controlada por Semente (Last Draw Hash).
+        """
+        # 1. Cria a Semente Mestra baseada no último sorteio (Imutável até novo sorteio)
+        try:
+            ultimo_sorteio_soma = int(df.iloc[0][cols].sum())
+            master_seed = ultimo_sorteio_soma + (seed_offset * 1000) # Offset garante variação por bilhete
+            np.random.seed(master_seed) # TRAVA O GERADOR
+        except:
+            np.random.seed(42 + seed_offset)
+
         todas = df.head(50)[cols].values.flatten()
         todas = todas[~np.isnan(todas)]
         freq = pd.Series(todas).value_counts()
-        numeros = freq.index.tolist()
+        numeros_ordenados = freq.index.tolist() # Do mais quente para o mais frio
         
+        # Lista base (Pool) de onde vamos tirar os números
         if tipo == "Hurst":
             somas = df[cols].sum(axis=1).head(60).values
             try:
+                # Hurst calculation
                 ts = np.array(somas)
                 lags = range(2, 20)
                 tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
@@ -146,52 +150,69 @@ class MotorInferencia:
                 h = poly[0] * 2.0
             except: h = 0.5
             
-            if h > 0.55: return set([int(x) for x in numeros[:qtd]]) # Quentes
-            elif h < 0.45: return set([int(x) for x in numeros[-qtd:]]) # Frios
-            else: 
-                import random
-                return set([int(x) for x in random.sample(numeros[:qtd*2], qtd)])
+            # Em vez de sample aleatório, pegamos "fatias" do pool, 
+            # mas usamos shuffle com seed para variar se precisarmos de muitos números
+            if h > 0.55: # Tendência (Top)
+                pool = numeros_ordenados[:qtd*3]
+            elif h < 0.45: # Reversão (Bottom)
+                pool = numeros_ordenados[-qtd*3:]
+            else: # Random Walk
+                pool = numeros_ordenados[:] 
+            
+            # Aqui está o segredo: Shuffle determinístico
+            pool_lista = list(pool)
+            np.random.shuffle(pool_lista)
+            return set([int(x) for x in pool_lista[:qtd]])
 
         elif tipo == "Markov":
-            # Lógica simples de Markov de 1ª ordem
             ultimo_sorteio = set(df.iloc[0][cols].dropna().values)
             candidatos = []
             for i in range(1, min(100, len(df)-1)):
                 jogo_passado = set(df.iloc[i][cols].dropna().values)
-                # Se coincidiu 2 ou mais números
                 if len(ultimo_sorteio.intersection(jogo_passado)) >= 2:
-                    # O que saiu DEPOIS?
                     candidatos.extend(df.iloc[i-1][cols].dropna().values)
             
             if candidatos:
-                top = pd.Series(candidatos).value_counts().head(qtd).index.tolist()
-                return set([int(x) for x in top])
+                # Ordena estritamente por contagem
+                top = pd.Series(candidatos).value_counts().index.tolist()
+                # Se precisar variar, pega um chunk maior e embaralha com seed
+                pool = top[:qtd*2]
+                np.random.shuffle(pool)
+                return set([int(x) for x in pool[:qtd]])
             else:
-                return set([int(x) for x in numeros[:qtd]])
+                pool = numeros_ordenados[:qtd*3]
+                np.random.shuffle(pool)
+                return set([int(x) for x in pool[:qtd]])
 
         elif tipo == "Gauss":
             somas = df[cols].sum(axis=1)
             media = somas.mean()
-            import random
-            for _ in range(50):
-                samp = random.sample(numeros[:qtd*3], qtd)
-                if abs(sum(samp) - media) < (media * 0.15):
-                    return set([int(x) for x in samp])
-            return set([int(x) for x in numeros[:qtd]])
+            # Tenta achar combinação deterministicamente usando seed no sample
+            pool = numeros_ordenados[:qtd*4]
+            
+            melhor_comb = set(pool[:qtd])
+            menor_diff = float('inf')
+            
+            for _ in range(50): # 50 tentativas fixas
+                samp = np.random.choice(pool, qtd, replace=False)
+                diff = abs(sum(samp) - media)
+                if diff < menor_diff:
+                    menor_diff = diff
+                    melhor_comb = set(samp)
+                if diff < (media * 0.05): break
+            
+            return set([int(x) for x in melhor_comb])
 
         elif tipo == "Estocástico":
             candidatos = []
-            for num in numeros:
+            for num in numeros_ordenados:
                 recente = (df.head(10)[cols].values == num).sum()
-                if recente <= 1: candidatos.append(num) # Oversold
+                if recente <= 1: candidatos.append(num)
             
-            if len(candidatos) < qtd: candidatos.extend(numeros)
-            return set([int(x) for x in candidatos[:qtd]])
+            if len(candidatos) < qtd: candidatos.extend(numeros_ordenados)
             
-        return set([int(x) for x in numeros[:qtd]])
-
-class MotorFractal:
-    # Mantido para compatibilidade se necessário
-    @staticmethod
-    def diagnosticar_tendencia(serie):
-        return 0.5, "LEGACY", "Use MotorInferencia"
+            pool = candidates = candidatos[:qtd*2]
+            np.random.shuffle(pool)
+            return set([int(x) for x in pool[:qtd]])
+            
+        return set([int(x) for x in numeros_ordenados[:qtd]])
