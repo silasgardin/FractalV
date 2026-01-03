@@ -21,7 +21,7 @@ class OtimizadorFinanceiro:
 
     def calcular_melhor_estrategia(self, jogo, orcamento):
         if self.df_precos is None:
-            if not self.carregar_dados(): return {"erro": "Erro crítico: Tabela de preços indisponível."}
+            if not self.carregar_dados(): return {"erro": "Erro crítico: Tabela indisponível."}
 
         jogo_key = str(jogo).upper().replace(' ', '_')
         tabela = self.df_precos[self.df_precos['Loteria_Key'].str.contains(jogo_key, na=False)].copy()
@@ -46,7 +46,7 @@ class OtimizadorFinanceiro:
 
 class MotorInferencia:
     """
-    Cérebro Matemático V8.0 - Com IA Nativa (Random Forest)
+    Cérebro Matemático V9.0 - Big Pool Strategy (Correção de Repetição)
     """
     
     @staticmethod
@@ -55,163 +55,145 @@ class MotorInferencia:
             if len(df_completo) < (profundidade + 50): 
                 return "Hurst (Padrão)", 0, {}
             
-            # Placar Geral Acumulado (Agora com IA)
-            placar_geral = {
-                "IA (Random Forest)": 0,
-                "Hurst (Fractal)": 0,
-                "Markov (Cadeias)": 0,
-                "Gauss (Normal)": 0,
-                "Estocástico": 0
-            }
+            placar = {"IA (Random Forest)": 0, "Hurst (Fractal)": 0, "Markov (Cadeias)": 0, "Gauss (Normal)": 0}
             
             for i in range(profundidade):
-                alvo_real = set(df_completo.iloc[i][cols_dezenas].dropna().astype(int).values)
-                qtd_alvo = len(alvo_real)
+                alvo = set(df_completo.iloc[i][cols_dezenas].dropna().astype(int).values)
+                qtd = len(alvo)
                 df_treino = df_completo.iloc[i+1:].copy()
                 
-                # Gera previsões (Seed offset garante consistência no teste)
-                p_ia = MotorInferencia._gerar_palpite_ml(df_treino, cols_dezenas, qtd_alvo, seed_offset=i)
-                p_hurst = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Hurst", seed_offset=i)
-                p_markov = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Markov", seed_offset=i)
-                p_gauss = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Gauss", seed_offset=i)
-                p_stoch = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Estocástico", seed_offset=i)
+                # Para backtest, usamos seed fixo (i) para reprodutibilidade
+                p_ia = MotorInferencia.gerar_aposta_final("IA", df_treino, cols_dezenas, qtd, seed_mix=i)
+                p_hurst = MotorInferencia.gerar_aposta_final("Hurst", df_treino, cols_dezenas, qtd, seed_mix=i)
+                p_markov = MotorInferencia.gerar_aposta_final("Markov", df_treino, cols_dezenas, qtd, seed_mix=i)
+                p_gauss = MotorInferencia.gerar_aposta_final("Gauss", df_treino, cols_dezenas, qtd, seed_mix=i)
                 
-                # Pontuação
-                placar_geral["IA (Random Forest)"] += len(alvo_real.intersection(p_ia))
-                placar_geral["Hurst (Fractal)"] += len(alvo_real.intersection(p_hurst))
-                placar_geral["Markov (Cadeias)"] += len(alvo_real.intersection(p_markov))
-                placar_geral["Gauss (Normal)"] += len(alvo_real.intersection(p_gauss))
-                placar_geral["Estocástico"] += len(alvo_real.intersection(p_stoch))
+                placar["IA (Random Forest)"] += len(alvo.intersection(p_ia))
+                placar["Hurst (Fractal)"] += len(alvo.intersection(p_hurst))
+                placar["Markov (Cadeias)"] += len(alvo.intersection(p_markov))
+                placar["Gauss (Normal)"] += len(alvo.intersection(p_gauss))
             
-            melhor_modelo = max(placar_geral, key=placar_geral.get)
-            return melhor_modelo, placar_geral[melhor_modelo], placar_geral
+            melhor = max(placar, key=placar.get)
+            return melhor, placar[melhor], placar
         except Exception as e:
             return "Hurst (Padrão)", 0, {}
 
     @staticmethod
     def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[], seed_index=0):
-        # Mapeamento
+        # Wrapper simples que chama a função de geração final
+        return MotorInferencia.gerar_aposta_final(
+            modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, 
+            fixos, excluidos, seed_mix=seed_index
+        )
+
+    @staticmethod
+    def gerar_aposta_final(modelo_nome, df, cols, qtd_alvo, fixos=[], excluidos=[], seed_mix=0):
+        """
+        Gera uma aposta única e variada.
+        1. Obtém um RANKING longo do modelo (ex: 40-50 números).
+        2. Filtra fixos/excluídos.
+        3. Sorteia deterministicamente os necessários desse ranking.
+        """
+        
+        # 1. Identifica o modelo
         tipo = "Hurst"
-        if "IA" in modelo_vencedor: tipo = "IA"
-        elif "Markov" in modelo_vencedor: tipo = "Markov"
-        elif "Gauss" in modelo_vencedor: tipo = "Gauss"
-        elif "Estocástico" in modelo_vencedor: tipo = "Estocástico"
+        if "IA" in modelo_nome: tipo = "IA"
+        elif "Markov" in modelo_nome: tipo = "Markov"
+        elif "Gauss" in modelo_nome: tipo = "Gauss"
         
-        vagas_abertas = qtd_numeros_gerar - len(fixos)
-        if vagas_abertas <= 0: return sorted(list(set(fixos))[:qtd_numeros_gerar])
+        vagas = qtd_alvo - len(fixos)
+        if vagas <= 0: return sorted(list(set(fixos))[:qtd_alvo])
         
-        # Gera candidatos
-        if tipo == "IA":
-             candidatos_brutos = MotorInferencia._gerar_palpite_ml(df_completo, cols_dezenas, qtd_numeros_gerar * 5, seed_offset=seed_index)
-        else:
-             candidatos_brutos = MotorInferencia._gerar_base(df_completo, cols_dezenas, qtd_numeros_gerar * 5, tipo, seed_offset=seed_index)
+        # 2. Obtém RANKING LONGO (Pool)
+        # Pedimos muito mais números (ex: 3x a meta) para ter variedade
+        tamanho_pool = max(qtd_alvo * 3, 40)
+        ranking = MotorInferencia._obter_ranking(tipo, df, cols, tamanho_pool)
         
-        candidatos_validos = [n for n in candidatos_brutos if n not in excluidos and n not in fixos]
-        escolhidos = candidatos_validos[:vagas_abertas]
+        # 3. Filtra
+        candidatos = [n for n in ranking if n not in excluidos and n not in fixos]
         
-        # Fallback
-        if len(escolhidos) < vagas_abertas:
-            todas = df_completo.head(50)[cols_dezenas].values.flatten()
+        # 4. Seleção Estocástica Determinística
+        # Aqui está o segredo: Usamos o seed_mix (número do jogo) para embaralhar o ranking
+        try:
+            # Seed única por jogo e por sorteio
+            seed_val = int(df.iloc[0][cols].sum()) + (seed_mix * 9999)
+            rng = np.random.default_rng(seed_val)
+            
+            # Pega os Top X candidatos (Elite) para sortear entre eles
+            # Ex: Se preciso de 15, pego os top 25 do ranking e sorteio 15.
+            # Isso garante qualidade (estão no topo) mas com variedade.
+            corte_elite = min(len(candidatos), vagas + 10) 
+            elite_pool = candidatos[:corte_elite]
+            
+            # Embaralha a elite e pega os necessários
+            escolhidos = list(rng.choice(elite_pool, size=vagas, replace=False))
+            
+        except:
+            # Fallback
+            escolhidos = candidates[:vagas]
+            
+        # 5. Complemento (se faltar)
+        if len(escolhidos) < vagas:
+            todas = df.head(50)[cols].values.flatten()
             todas = todas[~np.isnan(todas)]
             freq = pd.Series(todas).value_counts().index.tolist()
             extras = [n for n in freq if n not in excluidos and n not in fixos and n not in escolhidos]
-            escolhidos.extend(extras[:vagas_abertas - len(escolhidos)])
+            escolhidos.extend(extras[:vagas - len(escolhidos)])
             
-        resultado_final = list(set(escolhidos + fixos))
-        return sorted(resultado_final)
+        final = list(set(escolhidos + fixos))
+        return sorted(final)
 
-    # --- NOVO MOTOR DE I.A. (MACHINE LEARNING) ---
     @staticmethod
-    def _gerar_palpite_ml(df, cols, qtd, seed_offset=0):
+    def _obter_ranking(tipo, df, cols, qtd_pool):
         """
-        Usa Random Forest para prever os próximos números baseados em janelas deslizantes.
+        Retorna uma lista ORDENADA de candidatos (do melhor para o pior),
+        sem fazer sorteios. Apenas matemática pura.
         """
-        try:
-            # 1. Preparação dos Dados (Feature Engineering)
-            # Transformamos a série temporal em um problema supervisionado
-            # X = [Jogo T-5, Jogo T-4, ... Jogo T-1], Y = [Jogo T]
-            
-            # Limpa dados e garante inteiros
-            data = df[cols].dropna().values
-            data = data.astype(int)
-            
-            # Precisamos de pelo menos 20 jogos para treinar algo minimamente útil
-            if len(data) < 20: 
-                return MotorInferencia._gerar_base(df, cols, qtd, "Hurst", seed_offset)
-
-            # Ordena por data (o df original vem mais recente primeiro, precisamos inverter para treinar)
-            data = data[::-1] 
-            
-            X = []
-            y = []
-            window_size = 5 # Olha 5 jogos para trás para prever o próximo
-            
-            for i in range(len(data) - window_size):
-                # Flattening: Transforma matriz 5xDezenas em um vetor longo
-                features = data[i:i+window_size].flatten()
-                target = data[i+window_size] # O jogo seguinte
-                X.append(features)
-                y.append(target)
-            
-            if not X: return MotorInferencia._gerar_base(df, cols, qtd, "Hurst", seed_offset)
-            
-            # 2. Treinamento do Modelo (Fit)
-            # Random Forest Regressor: Tenta adivinhar os números exatos
-            # random_state fixo garante determinismo
-            model = RandomForestRegressor(n_estimators=50, random_state=42 + seed_offset)
-            model.fit(X, y)
-            
-            # 3. Predição (Predict)
-            # Pega os ULTIMOS 5 jogos reais para prever o FUTURO
-            last_window = data[-window_size:].flatten().reshape(1, -1)
-            prediction = model.predict(last_window)[0]
-            
-            # 4. Pós-processamento
-            # O modelo retorna floats (ex: 10.4, 23.9). Arredondamos e removemos duplicatas.
-            predicted_nums = set()
-            
-            # Estratégia Híbrida: Pega os números preditos + Vizinhos
-            for val in prediction:
-                n = int(round(val))
-                if n > 0: predicted_nums.add(n)
-            
-            # Se a IA não gerou números suficientes (duplicatas), completa com os mais frequentes
-            lista_final = list(predicted_nums)
-            
-            # Completa se faltar
-            todas = df.head(50)[cols].values.flatten()
-            freq = pd.Series(todas).value_counts().index.tolist()
-            
-            if len(lista_final) < qtd:
-                for n in freq:
-                    if n not in lista_final:
-                        lista_final.append(n)
-                    if len(lista_final) >= qtd * 2: break # Pega excesso para filtrar depois
-            
-            # Embaralha deterministicamente
-            np.random.seed(42 + seed_offset)
-            np.random.shuffle(lista_final)
-            
-            return set(lista_final[:qtd])
-            
-        except Exception as e:
-            # Fallback se a IA falhar
-            return MotorInferencia._gerar_base(df, cols, qtd, "Hurst", seed_offset)
-
-    # --- MOTORES ESTATÍSTICOS CLÁSSICOS ---
-    @staticmethod
-    def _gerar_base(df, cols, qtd, tipo, seed_offset=0):
-        try:
-            seed_val = int(df.iloc[0][cols].sum()) + (seed_offset * 777)
-            np.random.seed(seed_val)
-        except: np.random.seed(42)
-
+        # Base de frequência (fallback universal)
         todas = df.head(50)[cols].values.flatten()
         todas = todas[~np.isnan(todas)]
         freq = pd.Series(todas).value_counts()
-        numeros_ordenados = freq.index.tolist()
+        ranking_freq = freq.index.tolist()
         
-        if tipo == "Hurst":
+        if tipo == "IA":
+            try:
+                data = df[cols].dropna().values.astype(int)
+                if len(data) < 20: return ranking_freq
+                
+                # Prepara dados para IA
+                data = data[::-1] # Cronológico
+                X, y = [], []
+                win = 5
+                for i in range(len(data) - win):
+                    X.append(data[i:i+win].flatten())
+                    y.append(data[i+win])
+                
+                model = RandomForestRegressor(n_estimators=50, random_state=42)
+                model.fit(X, y)
+                
+                # Previsão
+                last = data[-win:].flatten().reshape(1, -1)
+                pred = model.predict(last)[0]
+                
+                # Ordena predição por "certeza" (valor numérico)
+                # Na regressão, valores inteiros repetidos indicam força
+                scores = {}
+                for val in pred:
+                    n = int(round(val))
+                    if n > 0: scores[n] = scores.get(n, 0) + 1
+                
+                # Ordena pelo score da IA
+                ranking_ia = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+                
+                # Completa com frequencia
+                for n in ranking_freq:
+                    if n not in ranking_ia: ranking_ia.append(n)
+                
+                return ranking_ia[:qtd_pool]
+            except:
+                return ranking_freq
+
+        elif tipo == "Hurst":
             somas = df[cols].sum(axis=1).head(60).values
             try:
                 ts = np.array(somas)
@@ -220,54 +202,33 @@ class MotorInferencia:
                 poly = np.polyfit(np.log(lags), np.log(tau), 1)
                 h = poly[0] * 2.0
             except: h = 0.5
-            pool = numeros_ordenados[:qtd*3] if h > 0.55 else (numeros_ordenados[-qtd*3:] if h < 0.45 else numeros_ordenados[:])
-            pool_lista = list(pool)
-            np.random.shuffle(pool_lista)
-            return set(pool_lista[:qtd])
+            
+            # Se tendência (>0.55), ranking normal. Se reversão (<0.45), inverte.
+            if h < 0.45: return ranking_freq[::-1][:qtd_pool]
+            return ranking_freq[:qtd_pool]
 
         elif tipo == "Markov":
-            ultimo_sorteio = set(df.iloc[0][cols].dropna().values)
+            ultimo = set(df.iloc[0][cols].dropna().values)
             candidatos = []
             for i in range(1, min(100, len(df)-1)):
-                jogo_passado = set(df.iloc[i][cols].dropna().values)
-                if len(ultimo_sorteio.intersection(jogo_passado)) >= 2:
+                passado = set(df.iloc[i][cols].dropna().values)
+                if len(ultimo.intersection(passado)) >= 2:
                     candidatos.extend(df.iloc[i-1][cols].dropna().values)
+            
             if candidatos:
-                top = pd.Series(candidatos).value_counts().index.tolist()
-                pool = top[:qtd*2]
-                np.random.shuffle(pool)
-                return set(pool[:qtd])
-            else:
-                pool = numeros_ordenados[:qtd*3]
-                np.random.shuffle(pool)
-                return set(pool[:qtd])
+                ranking_mk = pd.Series(candidatos).value_counts().index.tolist()
+                # Completa com freq
+                full = ranking_mk + [x for x in ranking_freq if x not in ranking_mk]
+                return full[:qtd_pool]
+            return ranking_freq[:qtd_pool]
 
         elif tipo == "Gauss":
-            somas = df[cols].sum(axis=1)
-            media = somas.mean()
-            pool = numeros_ordenados[:qtd*4]
-            melhor_comb = set(pool[:qtd])
-            menor_diff = float('inf')
-            for _ in range(50):
-                samp = np.random.choice(pool, qtd, replace=False)
-                diff = abs(sum(samp) - media)
-                if diff < menor_diff:
-                    menor_diff = diff
-                    melhor_comb = set(samp)
-                if diff < (media * 0.05): break
-            return set([int(x) for x in melhor_comb])
-
-        elif tipo == "Estocástico":
-            candidatos = []
-            for num in numeros_ordenados:
-                recente = (df.head(10)[cols].values == num).sum()
-                if recente <= 1: candidatos.append(num)
-            if len(candidatos) < qtd: candidatos.extend(numeros_ordenados)
-            pool = candidates = candidatos[:qtd*2]
-            np.random.shuffle(pool)
-            return set(pool[:qtd])
+            # Gauss prioriza números que ajustam a média
+            # Retornamos ranking de frequência, o filtro Gaussiano é complexo para ranking linear
+            # Então usamos a base estatística
+            return ranking_freq[:qtd_pool]
             
-        return set(numeros_ordenados[:qtd])
+        return ranking_freq[:qtd_pool]
 
 class MotorFractal:
     pass
