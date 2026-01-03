@@ -6,6 +6,8 @@ import requests
 from motor_matematico import OtimizadorFinanceiro, MotorFractal
 from links_planilhas import LINKS_CSV
 
+
+
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="FRACTALV", layout="wide", page_icon="🧩")
 
@@ -21,18 +23,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- FUNÇÕES DE DIAGNÓSTICO ---
-def check_connection_drive():
-    """Testa se consegue acessar o CSV Mestre de Valores"""
-    try:
-        url = LINKS_CSV.get("VALORES")
-        response = requests.head(url)
-        return response.status_code == 200
-    except:
-        return False
+# No src/app.py, procure a função check_connection_drive e troque por esta:
 
-def check_ai_connection():
-    """Verifica se a chave API existe nos segredos"""
-    return "GEMINI_API_KEY" in st.secrets
+def check_connection_drive():
+    """Testa a conexão lendo a primeira linha real do arquivo"""
+    url = LINKS_CSV.get("VALORES")
+    
+    # 1. Verifica se o link ainda é o de exemplo (placeholder)
+    if "..." in url or "INSIRA_O_ID" in url:
+        return False
+        
+    # 2. Tenta ler o arquivo de verdade
+    try:
+        # Lê apenas 1 linha para ser rápido
+        pd.read_csv(url, nrows=1, decimal=",", thousands=".", on_bad_lines='skip')
+        return True
+    except Exception as e:
+        # Se quiser debugar, descomente a linha abaixo para ver o erro no terminal
+        # print(f"Erro de Conexão: {e}")
+        return False
 
 # --- SIDEBAR: MONITORAMENTO DE SISTEMA ---
 with st.sidebar:
