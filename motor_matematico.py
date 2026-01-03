@@ -90,7 +90,7 @@ class MotorInferencia:
     def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[]):
         """
         Gera números usando o modelo vencedor + Filtros do Usuário.
-        ATENÇÃO: Aceita argumentos 'fixos' e 'excluidos'.
+        ATENÇÃO: Este método aceita 'fixos' e 'excluidos' para corrigir o TypeError.
         """
         
         # 1. Identifica estratégia base
@@ -106,7 +106,7 @@ class MotorInferencia:
         if vagas_abertas <= 0: 
             return sorted(list(set(fixos))[:qtd_numeros_gerar])
         
-        # 3. Gera candidatos em excesso (3x) para poder filtrar depois
+        # 3. Gera candidatos em excesso (4x) para poder filtrar depois
         candidatos_brutos = MotorInferencia._gerar_base(df_completo, cols_dezenas, qtd_numeros_gerar * 4, tipo)
         
         # 4. Aplica Filtros (Remove Excluídos e Fixos já presentes na lista bruta)
@@ -191,7 +191,7 @@ class MotorInferencia:
         return set([int(x) for x in numeros[:qtd]])
 
 class MotorFractal:
-    # Mantido para compatibilidade se necessário, mas a lógica agora está no Inferencia
+    # Mantido para compatibilidade se necessário
     @staticmethod
     def diagnosticar_tendencia(serie):
         return 0.5, "LEGACY", "Use MotorInferencia"
