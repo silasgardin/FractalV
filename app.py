@@ -83,7 +83,7 @@ def executar_atualizacao_geral():
 # --- 4. SIDEBAR E CONTROLES ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Auto-Pilot v11.0")
+    st.caption("Auto-Pilot v11.2 (Int Fix)")
     st.divider()
     
     # BOTÃO MESTRE
@@ -91,20 +91,38 @@ with st.sidebar:
         executar_atualizacao_geral()
         st.rerun()
         
-    st.divider()
-    
     if st.button("🗑️ Resetar Memória"):
         st.session_state.clear()
         st.rerun()
 
-    with st.expander("Legenda"):
-        st.markdown("<div class='loto-ball ball-normal'>01</div> IA/Modelo<br><div class='loto-ball ball-fixed'>10</div> Fixo", unsafe_allow_html=True)
+    st.divider()
+
+    # --- GUIA DO OPERADOR ---
+    with st.expander("📘 Guia do Operador", expanded=False):
+        st.markdown("### 🎨 Legenda Visual")
+        st.markdown("""
+        <div style='display: flex; align-items: center; margin-bottom: 5px;'>
+            <div class='loto-ball ball-normal'>01</div>
+            <span style='margin-left: 10px; font-size: 13px;'><b>Sugerido:</b> Escolhido pela Matemática/IA.</span>
+        </div>
+        <div style='display: flex; align-items: center; margin-bottom: 5px;'>
+            <div class='loto-ball ball-fixed'>10</div>
+            <span style='margin-left: 10px; font-size: 13px;'><b>Fixo:</b> Sua escolha obrigatória.</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### 🧠 Modelos Matemáticos")
+        st.info("""
+        **🏆 IA (Random Forest):** Busca padrões não-lineares complexos.
+        **🔗 Markov:** Probabilidade sequencial.
+        **📈 Hurst (Fractal):** Tendência vs Reversão.
+        **🔔 Gauss:** Média histórica.
+        """)
 
 # --- 5. LÓGICA DE AUTO-START ---
-# Se for a primeira vez que o app roda (ou F5), e não tem dados, roda tudo.
 if 'startup_check' not in st.session_state:
     st.session_state['startup_check'] = True
-    # Verifica se já temos dados da Mega Sena como proxy para "dados carregados"
     if f'dados_{JOGOS_LISTA[0]}' not in st.session_state:
         executar_atualizacao_geral()
 
@@ -173,9 +191,12 @@ for i, jogo in enumerate(JOGOS_LISTA):
                 with tab_filtros:
                     if freq is not None:
                         todas_possiveis = sorted(freq.index.tolist())
+                        # Converte para int para visualização limpa nos filtros
+                        todas_possiveis_int = [int(x) for x in todas_possiveis]
+                        
                         salvos = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
-                        fixos = st.multiselect("🔒 Fixos:", todas_possiveis, default=salvos['fixos'], key=f"fix_{jogo}")
-                        excluidos = st.multiselect("🚫 Excluídos:", todas_possiveis, default=salvos['excluidos'], key=f"exc_{jogo}")
+                        fixos = st.multiselect("🔒 Fixos:", todas_possiveis_int, default=salvos['fixos'], key=f"fix_{jogo}")
+                        excluidos = st.multiselect("🚫 Excluídos:", todas_possiveis_int, default=salvos['excluidos'], key=f"exc_{jogo}")
                         st.session_state[f'filtros_{jogo}'] = {'fixos': fixos, 'excluidos': excluidos}
 
                 # 4. Mesa de Análise (Gerador)
@@ -194,7 +215,8 @@ for i, jogo in enumerate(JOGOS_LISTA):
                         def to_csv(l):
                             out = BytesIO()
                             d = pd.DataFrame(l).drop(columns=['Dezenas'])
-                            d['Dezenas'] = [", ".join(map(str, x['Dezenas'])) for x in l]
+                            # Garante formatação Inteira no CSV
+                            d['Dezenas'] = [", ".join([str(int(n)) for n in x['Dezenas']]) for x in l]
                             d.to_csv(out, index=False, sep=';')
                             return out.getvalue()
 
@@ -213,7 +235,8 @@ for i, jogo in enumerate(JOGOS_LISTA):
                                 html = f"<span class='game-index'>#{idx_global:02d}</span>"
                                 for n in p:
                                     cls = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
-                                    html += f"<div class='loto-ball {cls}'>{str(n).zfill(2)}</div>"
+                                    # CORREÇÃO AQUI: str(int(n)) remove o .0 flutuante
+                                    html += f"<div class='loto-ball {cls}'>{str(int(n)).zfill(2)}</div>"
                                 
                                 stats = f"P:{len([x for x in p if x%2==0])} Σ:{sum(p)}"
                                 sc = calc_score(p)
@@ -235,6 +258,5 @@ for i, jogo in enumerate(JOGOS_LISTA):
                     else: st.info("Calcule o orçamento.")
 
             else:
-                # Caso de falha no download
                 st.warning("Falha ao carregar dados.")
                 st.caption("Tente clicar no botão de atualizar.")
