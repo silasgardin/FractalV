@@ -65,26 +65,21 @@ def gerar_palpites_inteligentes(qtd_jogos, qtd_dezenas_por_jogo, frequencia, mod
     numeros_disponiveis = frequencia.index.tolist()
     
     # Lógica de Pesos
-    # Se Tendência: Maior peso para quem sai mais
-    # Se Reversão: Maior peso para quem sai menos (atrasados)
     if "TENDÊNCIA" in modo_fractal:
         pesos = np.linspace(1.0, 0.2, len(numeros_disponiveis))
     elif "REVERSÃO" in modo_fractal:
         pesos = np.linspace(0.2, 1.0, len(numeros_disponiveis))
     else:
-        pesos = np.ones(len(numeros_disponiveis)) # Pesos iguais
+        pesos = np.ones(len(numeros_disponiveis)) 
         
-    # Normaliza para somar 1 (obrigatório para numpy)
     pesos = pesos / pesos.sum()
     
     for _ in range(qtd_jogos):
         try:
-            # Sorteia sem reposição
             aposta = np.random.choice(numeros_disponiveis, int(qtd_dezenas_por_jogo), p=pesos, replace=False)
             aposta.sort()
             palpites.append(aposta)
         except:
-            # Fallback seguro
             palpites.append(np.random.choice(numeros_disponiveis, int(qtd_dezenas_por_jogo), replace=False))
             
     return palpites
@@ -113,7 +108,6 @@ with st.sidebar:
 # --- 5. PAINEL PRINCIPAL ---
 st.title("Painel de Controle Estratégico")
 
-# Inicializa Otimizador
 otimizador = OtimizadorFinanceiro(LINKS_CSV.get("VALORES"))
 
 jogos = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
@@ -147,12 +141,10 @@ for i, jogo in enumerate(jogos):
                         res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
                         
                         if "erro" not in res:
-                            # Salva no estado para usar na aba 2
                             st.session_state[f'res_{jogo}'] = res
                             st.session_state[f'hurst_{jogo}'] = (hurst, modo)
                             st.success("Cálculo Realizado! Veja a aba 'Palpites'.")
                             
-                            # Análise IA (se disponível)
                             if model:
                                 with st.spinner("Consultando IA..."):
                                     try:
@@ -178,11 +170,10 @@ for i, jogo in enumerate(jogos):
                             
                             st.markdown(f"👉 **{q_volantes}x** Jogos de **{q_dezenas}** dezenas:")
                             
-                            # Gera os números
                             palpites = gerar_palpites_inteligentes(q_volantes, q_dezenas, freq, modo_atual)
                             
                             for p in palpites:
-                                p_str = [str(int(n)).zfill(2) for n in p] # Formata 01, 02...
+                                p_str = [str(int(n)).zfill(2) for n in p]
                                 html_nums = "".join([f"<span class='big-number'>{n}</span>" for n in p_str])
                                 st.markdown(html_nums, unsafe_allow_html=True)
                             
@@ -190,16 +181,17 @@ for i, jogo in enumerate(jogos):
                     else:
                         st.info("Calcule a estratégia na aba anterior primeiro.")
 
-                # ABA 3: GRÁFICO
+                # ABA 3: GRÁFICO (CORRIGIDO AQUI)
                 with tab3:
                     if len(series_soma) > 0:
-                        # Inverte para mostrar cronologia esquerda->direita
                         dados_grafico = series_soma[::-1] 
                         fig = px.line(y=dados_grafico, labels={'x': 'Tempo', 'y': 'Soma Dezenas'})
                         fig.update_layout(title="Onda Fractal (Últimos 100)", template="plotly_dark", height=250, margin=dict(l=20, r=20, t=30, b=20))
-                        # Adiciona linha média
                         fig.add_hline(y=np.mean(dados_grafico), line_dash="dot", annotation_text="Média", annotation_position="bottom right")
-                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # --- A CORREÇÃO ESTÁ NESTA LINHA ABAIXO ---
+                        # Adicionamos key=f"graf_{jogo}" para evitar duplicação de ID
+                        st.plotly_chart(fig, use_container_width=True, key=f"graf_{jogo}")
             
             else:
                 st.warning("Aguardando conexão com base de dados...")
