@@ -6,9 +6,9 @@ from motor_matematico import OtimizadorFinanceiro, MotorInferencia
 from links_planilhas import LINKS_CSV
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="FRACTALV | Pro Analyst", layout="wide", page_icon="🧩")
+st.set_page_config(page_title="FRACTALV | Purple Edition", layout="wide", page_icon="🧩")
 
-# --- 2. CSS PERSONALIZADO (Visual Lotérico) ---
+# --- 2. CSS PERSONALIZADO (Visual Roxo/Neon) ---
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; }
@@ -25,7 +25,7 @@ st.markdown("""
         align-items: center;
     }
     
-    /* Bolas de Lotaria */
+    /* Bolas de Lotaria - Base */
     .loto-ball { 
         display: inline-flex;
         align-items: center;
@@ -34,22 +34,27 @@ st.markdown("""
         height: 35px;
         border-radius: 50%;
         font-weight: bold;
-        color: #FFF;
+        color: #FFF; /* Texto Branco */
         margin: 2px;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
         font-size: 14px;
     }
     
-    .ball-normal { background: radial-gradient(circle at 10px 10px, #4b5563, #1f2937); border: 1px solid #6b7280; }
+    /* --- A MUDANÇA DE COR ESTÁ AQUI --- */
+    .ball-normal { 
+        background: radial-gradient(circle at 10px 10px, #a855f7, #581c87); /* Gradiente Roxo */
+        border: 1px solid #c084fc; /* Borda Roxa Clara */
+    }
+    
+    /* Mantivemos os fixos em verde para destaque */
     .ball-fixed { background: radial-gradient(circle at 10px 10px, #00FF99, #008f55); color: #000; border: 1px solid #00FF99; }
-    .ball-hot { background: radial-gradient(circle at 10px 10px, #ff5e5e, #990000); border: 1px solid #ff0000; }
     
     /* Tags e Stats */
     .winner-tag { background-color: #00FF99; color: black; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 12px; }
     .stat-box { font-size: 11px; color: #aaa; background: #1f2937; padding: 4px 8px; border-radius: 4px; margin-top: 5px; display: inline-block; }
     
     /* Barra de Progresso Custom */
-    .stProgress > div > div > div > div { background-color: #00FF99; }
+    .stProgress > div > div > div > div { background-color: #a855f7; } /* Barra Roxa também */
 </style>
 """, unsafe_allow_html=True)
 
@@ -86,18 +91,15 @@ def calcular_score_visual(p, total_dezenas):
     if len(p) == 0: return 0
     pares = len([x for x in p if x % 2 == 0])
     ratio = pares / len(p)
-    # O ideal é 50% pares (0.5). Quanto mais longe, menor o score.
     diff = abs(ratio - 0.5) 
-    score = max(0, 1.0 - (diff * 2)) # 1.0 é perfeito, 0.0 é péssimo
+    score = max(0, 1.0 - (diff * 2))
     return score
 
 def to_csv(lista_jogos):
     """Converte lista de jogos para CSV"""
     output = BytesIO()
     df = pd.DataFrame(lista_jogos)
-    # Remove coluna complexa de dezenas para o CSV ficar limpo
     df_clean = df.drop(columns=['Dezenas'])
-    # Adiciona dezenas como string
     df_clean['Dezenas'] = [", ".join(map(str, x)) for x in df['Dezenas']]
     df_clean.to_csv(output, index=False, sep=';')
     return output.getvalue()
@@ -105,15 +107,14 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Pro Analyst v5.0")
+    st.caption("Pro Analyst v5.1 (Purple)")
     st.divider()
     st.info("Sistema de Análise Híbrida Ativo.")
     
     with st.expander("📖 Legenda das Bolas"):
         st.markdown("""
-        <div class='loto-ball ball-normal'>01</div> Normal (Matemático)<br>
-        <div class='loto-ball ball-fixed'>10</div> Fixo (Obrigatório)<br>
-        <div class='loto-ball ball-hot'>59</div> Sugestão (Futuro)
+        <div class='loto-ball ball-normal'>01</div> Gerado pelo Modelo<br>
+        <div class='loto-ball ball-fixed'>10</div> Fixo (Sua escolha)<br>
         """, unsafe_allow_html=True)
 
 # --- 5. PAINEL PRINCIPAL ---
@@ -162,9 +163,9 @@ for i, jogo in enumerate(jogos):
                 # ABA 2: FILTROS VISUAIS
                 with tab_filtros:
                     if freq is not None:
-                        # Heatmap Horizontal
-                        st.caption("Top 10 Dezenas Mais Frequentes (Trend)")
-                        st.bar_chart(freq.head(10), height=120, color="#00FF99")
+                        # Heatmap Horizontal (Mudado para roxo também)
+                        st.caption("Top 10 Dezenas Mais Frequentes")
+                        st.bar_chart(freq.head(10), height=120, color="#a855f7")
                         
                         todas_possiveis = sorted(freq.index.tolist())
                         fixos = st.multiselect("🔒 Números Fixos (Obrigatórios):", todas_possiveis, key=f"fix_{jogo}")
@@ -172,14 +173,13 @@ for i, jogo in enumerate(jogos):
                         
                         st.session_state[f'filtros_{jogo}'] = {'fixos': fixos, 'excluidos': excluidos}
 
-                # ABA 3: GERADOR VISUAL (Bolas)
+                # ABA 3: GERADOR VISUAL (Bolas Roxas)
                 with tab_gerador:
                     if f'res_{jogo}' in st.session_state:
                         res = st.session_state[f'res_{jogo}']
                         modelo_ativo = st.session_state[f'modelo_{jogo}']
                         filtros = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
                         
-                        # Lista para exportação CSV
                         dados_exportacao = []
                         
                         st.markdown(f"**Estratégia Ativa:** {modelo_ativo}")
@@ -201,11 +201,10 @@ for i, jogo in enumerate(jogos):
                             
                             # Renderiza cada jogo
                             for idx, p in enumerate(palpites_gerados):
-                                # CORREÇÃO: AQUI ESTAVA O ERRO HTML_
                                 html_balls = ""
                                 for n in p:
                                     n_str = str(int(n)).zfill(2)
-                                    # Estilo da bola
+                                    # Define a cor da bola
                                     css_class = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
                                     html_balls += f"<div class='loto-ball {css_class}'>{n_str}</div>"
                                 
@@ -218,10 +217,10 @@ for i, jogo in enumerate(jogos):
                                 with col_visual:
                                     st.markdown(html_balls, unsafe_allow_html=True)
                                 with col_info:
+                                    # Barra de progresso roxa
                                     st.progress(score_eq, text="Equilíbrio")
                                     st.markdown(f"<div class='stat-box'>{stats_txt}</div>", unsafe_allow_html=True)
                                 
-                                # Adiciona para exportação
                                 dados_exportacao.append({
                                     "Jogo": idx + 1,
                                     "Dezenas": p,
@@ -234,13 +233,9 @@ for i, jogo in enumerate(jogos):
                         
                         # --- ÁREA DE DOWNLOAD ---
                         c_dl1, c_dl2 = st.columns(2)
-                        
-                        # Download TXT (Simples)
                         if dados_exportacao:
                             txt_data = "\n".join([f"Jogo {d['Jogo']}: {d['Dezenas']}" for d in dados_exportacao])
                             c_dl1.download_button("📄 Baixar Texto (.txt)", txt_data, f"{jogo}_fractalv.txt")
-                            
-                            # Download CSV (Excel)
                             csv_data = to_csv(dados_exportacao)
                             c_dl2.download_button("📊 Baixar Excel (.csv)", csv_data, f"{jogo}_fractalv.csv", "text/csv")
                         
