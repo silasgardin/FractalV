@@ -1,145 +1,205 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import google.generativeai as genai
-import time
-import requests
+import plotly.express as px
 from motor_matematico import OtimizadorFinanceiro, MotorFractal
 from links_planilhas import LINKS_CSV
 
-# --- 1. CONFIGURAÇÃO INICIAL (Sempre a primeira coisa) ---
-st.set_page_config(page_title="FRACTALV", layout="wide", page_icon="🧩")
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="FRACTALV | Pro", layout="wide", page_icon="🧩")
 
-# --- 2. CSS PARA VISUAL TECH ---
+# --- 2. CSS PERSONALIZADO (Visual Tech) ---
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; }
-    .status-box { padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 14px;}
-    .success { background-color: #1f77b4; color: white; }
-    .error { background-color: #d62728; color: white; }
-    .card-title { color: #00FF99; font-size: 22px; font-weight: bold; border-bottom: 1px solid #444; }
+    .card-title { color: #00FF99; font-size: 20px; font-weight: bold; border-bottom: 1px solid #333; margin-bottom: 10px;}
+    .big-number { 
+        font-size: 18px; font-weight: bold; color: #FFF; 
+        background: #262730; padding: 4px 8px; border-radius: 4px; 
+        border: 1px solid #444; display: inline-block; margin: 2px;
+    }
+    .metric-box { background: #1f2937; padding: 10px; border-radius: 5px; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. DEFINIÇÃO DE FUNÇÕES (O Python precisa ler isso antes de desenhar a tela) ---
-
-def check_connection_drive():
-    """Testa a conexão lendo a primeira linha real do arquivo de Valores"""
-    url = LINKS_CSV.get("VALORES")
-    if not url or "INSIRA_O_ID" in url:
-        return False
-    try:
-        # Tenta ler apenas 1 linha para validar conexão
-        pd.read_csv(url, nrows=1, decimal=",", thousands=".", on_bad_lines='skip')
-        return True
-    except:
-        return False
-
-def check_ai_connection():
-    """Verifica se a chave API existe nos segredos do Streamlit"""
-    # Verifica se o arquivo secrets foi carregado corretamente
-    if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
-        return True
-    return False
-
+# --- 3. FUNÇÕES AUXILIARES ---
 @st.cache_data(ttl=600)
 def get_data(jogo_key):
-    """Lê os dados do jogo específico"""
+    """Lê os dados e prepara séries temporais"""
     link = LINKS_CSV.get(jogo_key)
     try:
-        # Lê e limpa
+        # Tenta ler ignorando erros de linha
         df = pd.read_csv(link, decimal=",", thousands=".", on_bad_lines='skip')
-        # Pega colunas D1, D2... para cálculo
-        cols = [c for c in df.columns if c.startswith('D') and '2º' not in c]
-        if not cols: return None, None
         
-        series = df.head(60)[cols].sum(axis=1).values # Soma das dezenas para Hurst
+        # Identifica colunas de dezenas (D1, D2...)
+        cols = [c for c in df.columns if c.startswith('D') and '2º' not in c]
+        if not cols: return None, None, None
+        
+        # Garante que sejam números
+        for c in cols:
+            df[c] = pd.to_numeric(df[c], errors='coerce')
+        
+        # Cria coluna de SOMA (para o gráfico fractal)
+        df['Soma'] = df[cols].sum(axis=1)
+        
+        # Pega últimos 100 resultados para gráfico
+        series = df.head(100)['Soma'].values
+        
+        # Calcula frequência para gerar palpites inteligentes
+        todas_dezenas = df.head(50)[cols].values.flatten()
+        todas_dezenas = todas_dezenas[~np.isnan(todas_dezenas)] # Remove NaNs
+        frequencia = pd.Series(todas_dezenas).value_counts()
+        
         last_draw = df.iloc[0]
-        return last_draw, series
+        return last_draw, series, frequencia
     except:
-        return None, None
+        return None, None, None
 
-# --- 4. EXECUÇÃO DA INTERFACE (SIDEBAR) ---
+def gerar_palpites_inteligentes(qtd_jogos, qtd_dezenas_por_jogo, frequencia, modo_fractal):
+    """Gera números baseados na lógica Quente/Frio do Fractal"""
+    palpites = []
+    if frequencia is None or len(frequencia) == 0:
+        return []
+
+    numeros_disponiveis = frequencia.index.tolist()
+    
+    # Lógica de Pesos
+    # Se Tendência: Maior peso para quem sai mais
+    # Se Reversão: Maior peso para quem sai menos (atrasados)
+    if "TENDÊNCIA" in modo_fractal:
+        pesos = np.linspace(1.0, 0.2, len(numeros_disponiveis))
+    elif "REVERSÃO" in modo_fractal:
+        pesos = np.linspace(0.2, 1.0, len(numeros_disponiveis))
+    else:
+        pesos = np.ones(len(numeros_disponiveis)) # Pesos iguais
+        
+    # Normaliza para somar 1 (obrigatório para numpy)
+    pesos = pesos / pesos.sum()
+    
+    for _ in range(qtd_jogos):
+        try:
+            # Sorteia sem reposição
+            aposta = np.random.choice(numeros_disponiveis, int(qtd_dezenas_por_jogo), p=pesos, replace=False)
+            aposta.sort()
+            palpites.append(aposta)
+        except:
+            # Fallback seguro
+            palpites.append(np.random.choice(numeros_disponiveis, int(qtd_dezenas_por_jogo), replace=False))
+            
+    return palpites
+
+# --- 4. SIDEBAR (CONFIGURAÇÃO) ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Monitoramento de Recursos")
+    st.caption("Sistema de Inteligência Fractal v2.0")
     st.divider()
-
-    # AGORA VAI FUNCIONAR: As funções já foram lidas nas linhas acima
-    drive_ok = check_connection_drive()
-    if drive_ok:
-        st.success("Base de Dados (Drive): CONECTADO 🟢")
-    else:
-        st.error("Base de Dados (Drive): FALHA 🔴")
-        st.caption("Verifique o arquivo links_planilhas.py")
-
-    ai_ok = check_ai_connection()
-    if ai_ok:
-        st.success("Módulo Gemini AI: ATIVO 🟢")
-        # Configura a IA
+    
+    # Status IA
+    if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+        st.success("IA Gemini: CONECTADO 🟢")
         try:
             genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
             model = genai.GenerativeModel('gemini-pro')
         except:
-            st.warning("Erro ao iniciar Gemini")
             model = None
     else:
-        st.warning("Módulo Gemini AI: DESCONECTADO 🟠")
+        st.warning("IA Gemini: OFF 🟠")
         model = None
     
     st.divider()
-    st.markdown("**Versão:** FractalV-1.3 (Stable)")
+    st.info("O modelo ajusta os pesos matemáticos automaticamente baseado no Hurst.")
 
-# --- 5. EXECUÇÃO DA INTERFACE (PRINCIPAL) ---
+# --- 5. PAINEL PRINCIPAL ---
 st.title("Painel de Controle Estratégico")
 
+# Inicializa Otimizador
 otimizador = OtimizadorFinanceiro(LINKS_CSV.get("VALORES"))
 
 jogos = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
-cols = st.columns(3)
+cols = st.columns(2)
 
 for i, jogo in enumerate(jogos):
-    with cols[i % 3]:
+    with cols[i % 2]:
         with st.container(border=True):
             st.markdown(f"<div class='card-title'>{jogo.replace('_', ' ')}</div>", unsafe_allow_html=True)
             
-            # Backtest Automático
-            last_draw, series_numerica = get_data(jogo)
+            # 1. Dados e Diagnóstico
+            last_draw, series_soma, freq = get_data(jogo)
             
-            if series_numerica is not None:
-                st.caption(f"Último: {last_draw.get('Data', '---')} (Conc. {last_draw.get('Concurso', '---')})")
+            if series_soma is not None:
+                # Diagnóstico Fractal
+                hurst, modo, desc = MotorFractal.diagnosticar_tendencia(series_soma)
                 
-                hurst, estrategia_nome, explicacao_tec = MotorFractal.diagnosticar_tendencia(series_numerica)
+                # Exibição Rápida
+                c1, c2 = st.columns([1, 2])
+                c1.metric("Hurst", f"{hurst:.2f}")
+                c2.info(f"Modo: **{modo}**")
                 
-                st.metric("Hurst (Volatilidade)", f"{hurst:.2f}")
-                st.info(f"🎯 Modo: **{estrategia_nome}**")
-            else:
-                st.warning("Aguardando conexão...")
-                hurst = 0.5
-                estrategia_nome = "Neutro"
-
-            st.divider()
-            
-            # Gestão de Orçamento
-            orcamento = st.number_input("Budget (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
-            
-            # Botão só ativa se tiver conexão com banco de dados
-            if st.button("PROCESSAR ESTRATÉGIA", key=f"btn_{jogo}", disabled=not drive_ok):
-                with st.spinner("Otimizando alocação..."):
-                    res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
+                # --- SISTEMA DE ABAS ---
+                tab1, tab2, tab3 = st.tabs(["💰 Estratégia", "🎲 Palpites", "📈 Gráfico"])
+                
+                # ABA 1: DEFINIÇÃO DE ORÇAMENTO
+                with tab1:
+                    orcamento = st.number_input("Orçamento (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
                     
-                    if "erro" not in res:
-                        st.success("Alocação Otimizada!")
-                        for item in res['carrinho']:
-                            st.write(f"• **{item['qtd_volantes']}x** jogos de **{item.get('dezenas', item.get('qtd_dezenas'))}** dezenas.")
+                    if st.button("CALCULAR ESTRATÉGIA", key=f"btn_{jogo}"):
+                        res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
                         
-                        st.caption(f"Custo Total: R$ {sum(i['custo_total'] for i in res['carrinho']):.2f}")
+                        if "erro" not in res:
+                            # Salva no estado para usar na aba 2
+                            st.session_state[f'res_{jogo}'] = res
+                            st.session_state[f'hurst_{jogo}'] = (hurst, modo)
+                            st.success("Cálculo Realizado! Veja a aba 'Palpites'.")
+                            
+                            # Análise IA (se disponível)
+                            if model:
+                                with st.spinner("Consultando IA..."):
+                                    try:
+                                        p = f"Analise curto: Jogo {jogo}, Hurst {hurst:.2f} ({modo}). Orçamento R$ {orcamento}. Sugestão: {res['carrinho']}."
+                                        analise = model.generate_content(p).text
+                                        st.caption(f"🤖 **IA:** {analise}")
+                                    except:
+                                        pass
+                        else:
+                            st.error(res['erro'])
 
-                        if model and ai_ok:
-                            try:
-                                prompt = f"Analise matematicamente para {jogo}: Hurst {hurst:.2f} ({estrategia_nome}). Orçamento R$ {orcamento} distribuído em {len(res['carrinho'])} tipos de apostas."
-                                response = model.generate_content(prompt)
-                                st.markdown(f"**🤖 Análise:** {response.text}")
-                            except:
-                                st.caption("IA indisponível.")
+                # ABA 2: PALPITES GERADOS
+                with tab2:
+                    if f'res_{jogo}' in st.session_state:
+                        res = st.session_state[f'res_{jogo}']
+                        modo_atual = st.session_state[f'hurst_{jogo}'][1]
+                        
+                        st.write(f"Distribuição Otimizada ({modo_atual}):")
+                        
+                        for item in res['carrinho']:
+                            q_volantes = item['qtd_volantes']
+                            q_dezenas = int(item['dezenas'])
+                            
+                            st.markdown(f"👉 **{q_volantes}x** Jogos de **{q_dezenas}** dezenas:")
+                            
+                            # Gera os números
+                            palpites = gerar_palpites_inteligentes(q_volantes, q_dezenas, freq, modo_atual)
+                            
+                            for p in palpites:
+                                p_str = [str(int(n)).zfill(2) for n in p] # Formata 01, 02...
+                                html_nums = "".join([f"<span class='big-number'>{n}</span>" for n in p_str])
+                                st.markdown(html_nums, unsafe_allow_html=True)
+                            
+                            st.divider()
                     else:
-                        st.error(res["erro"])
+                        st.info("Calcule a estratégia na aba anterior primeiro.")
+
+                # ABA 3: GRÁFICO
+                with tab3:
+                    if len(series_soma) > 0:
+                        # Inverte para mostrar cronologia esquerda->direita
+                        dados_grafico = series_soma[::-1] 
+                        fig = px.line(y=dados_grafico, labels={'x': 'Tempo', 'y': 'Soma Dezenas'})
+                        fig.update_layout(title="Onda Fractal (Últimos 100)", template="plotly_dark", height=250, margin=dict(l=20, r=20, t=30, b=20))
+                        # Adiciona linha média
+                        fig.add_hline(y=np.mean(dados_grafico), line_dash="dot", annotation_text="Média", annotation_position="bottom right")
+                        st.plotly_chart(fig, use_container_width=True)
+            
+            else:
+                st.warning("Aguardando conexão com base de dados...")
