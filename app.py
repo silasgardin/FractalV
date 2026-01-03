@@ -1,189 +1,204 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
-from scipy.stats import norm
+from io import BytesIO
+from motor_matematico import OtimizadorFinanceiro, MotorInferencia
+from links_planilhas import LINKS_CSV
 
-class OtimizadorFinanceiro:
-    """Gerencia o orçamento e a distribuição de apostas"""
-    def __init__(self, link_csv_valores):
-        self.url = link_csv_valores
-        self.df_precos = None
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="FRACTALV | Pro Analyst", layout="wide", page_icon="🧩")
 
-    def carregar_dados(self):
-        try:
-            self.df_precos = pd.read_csv(self.url, decimal=",", thousands=".", on_bad_lines='skip')
-            self.df_precos.dropna(subset=['Loteria'], inplace=True)
-            if 'Preço Total (R$)' in self.df_precos.columns:
-                self.df_precos['Preço Total (R$)'] = self.df_precos['Preço Total (R$)'].astype(str).apply(
-                    lambda x: float(x.replace('R$', '').replace('.', '').replace(',', '.').strip()) if isinstance(x, str) else x
-                )
-            self.df_precos['Loteria_Key'] = self.df_precos['Loteria'].astype(str).str.upper().str.replace(' ', '_').str.replace('Á', 'A')
-            return True
-        except:
-            return False
-
-    def calcular_melhor_estrategia(self, jogo, orcamento):
-        if self.df_precos is None:
-            if not self.carregar_dados():
-                return {"erro": "Erro crítico: Não foi possível ler a tabela de preços."}
-
-        jogo_key = str(jogo).upper().replace(' ', '_')
-        tabela = self.df_precos[self.df_precos['Loteria_Key'].str.contains(jogo_key, na=False)].copy()
-        
-        if tabela.empty: return {"erro": f"Jogo '{jogo}' não encontrado na tabela."}
-
-        tabela = tabela.sort_values(by='Preço Total (R$)', ascending=False)
-        estrategia = {"jogo": jogo, "orcamento_inicial": orcamento, "carrinho": [], "sobra": 0}
-        saldo = orcamento
-
-        for _, row in tabela.iterrows():
-            try:
-                custo = float(row['Preço Total (R$)'])
-                if custo <= 0: continue
-                
-                if saldo >= custo:
-                    qtd = int(saldo // custo)
-                    dezenas_val = int(float(row['Qtd. Dezenas']))
-                    estrategia['carrinho'].append({
-                        "qtd_volantes": qtd,
-                        "dezenas": dezenas_val,
-                        "custo_total": qtd * custo
-                    })
-                    saldo -= (qtd * custo)
-            except: continue
-        
-        estrategia['sobra'] = round(saldo, 2)
-        return estrategia
-
-class MotorInferencia:
-    """
-    O Cérebro Matemático com suporte a Filtros Manuais.
-    """
+# --- 2. CSS PERSONALIZADO (Visual Lotérico) ---
+st.markdown("""
+<style>
+    .stApp { background-color: #0E1117; }
     
-    @staticmethod
-    def executar_backtest(df_completo, cols_dezenas):
-        """Testa qual modelo teria acertado mais no último sorteio."""
-        try:
-            if len(df_completo) < 50: return "Padrão (Dados Insuficientes)", 0, {}
-            
-            alvo_real = set(df_completo.iloc[0][cols_dezenas].dropna().astype(int).values)
-            df_treino = df_completo.iloc[1:].copy()
-            qtd_alvo = len(alvo_real)
-            
-            # Gera palpites SEM filtros para o teste puro
-            p_hurst = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Hurst")
-            p_markov = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Markov")
-            p_gauss = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Gauss")
-            p_stoch = MotorInferencia._gerar_base(df_treino, cols_dezenas, qtd_alvo, "Estocástico")
-            
-            scores = {
-                "Hurst (Fractal)": len(alvo_real.intersection(p_hurst)),
-                "Markov (Cadeias)": len(alvo_real.intersection(p_markov)),
-                "Gauss (Normal)": len(alvo_real.intersection(p_gauss)),
-                "Estocástico (Oscilador)": len(alvo_real.intersection(p_stoch))
-            }
-            
-            melhor = max(scores, key=scores.get)
-            return melhor, scores[melhor], scores
-        except Exception as e:
-            return "Padrão (Erro)", 0, {}
+    /* Card do Jogo */
+    .card-header {
+        color: #00FF99; 
+        font-size: 22px; 
+        font-weight: bold; 
+        border-bottom: 2px solid #333; 
+        margin-bottom: 15px;
+        display: flex;
+        justify_content: space-between;
+        align-items: center;
+    }
+    
+    /* Bolas de Lotaria */
+    .loto-ball { 
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        font-weight: bold;
+        color: #FFF;
+        margin: 2px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        font-size: 14px;
+    }
+    
+    .ball-normal { background: radial-gradient(circle at 10px 10px, #4b5563, #1f2937); border: 1px solid #6b7280; }
+    .ball-fixed { background: radial-gradient(circle at 10px 10px, #00FF99, #008f55); color: #000; border: 1px solid #00FF99; }
+    .ball-hot { background: radial-gradient(circle at 10px 10px, #ff5e5e, #990000); border: 1px solid #ff0000; }
+    
+    /* Tags e Stats */
+    .winner-tag { background-color: #00FF99; color: black; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 12px; }
+    .stat-box { font-size: 11px; color: #aaa; background: #1f2937; padding: 4px 8px; border-radius: 4px; margin-top: 5px; display: inline-block; }
+    
+    /* Barra de Progresso Custom */
+    .stProgress > div > div > div > div { background-color: #00FF99; }
+</style>
+""", unsafe_allow_html=True)
 
-    @staticmethod
-    def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[]):
-        """Gera números usando o modelo vencedor + Filtros do Usuário"""
+# --- 3. FUNÇÕES AUXILIARES ---
+@st.cache_data(ttl=600)
+def get_data_and_backtest(jogo_key):
+    link = LINKS_CSV.get(jogo_key)
+    try:
+        df = pd.read_csv(link, decimal=",", thousands=".", on_bad_lines='skip')
+        cols = [c for c in df.columns if c.startswith('D') and '2º' not in c]
+        if not cols: return None, None, None, None, None
         
-        # 1. Identifica estratégia base
-        tipo = "Hurst"
-        if "Markov" in modelo_vencedor: tipo = "Markov"
-        elif "Gauss" in modelo_vencedor: tipo = "Gauss"
-        elif "Estocástico" in modelo_vencedor: tipo = "Estocástico"
+        for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
         
-        # 2. Calcula quantas vagas restam (Total - Fixos)
-        vagas_abertas = qtd_numeros_gerar - len(fixos)
-        if vagas_abertas <= 0: return sorted(list(set(fixos))[:qtd_numeros_gerar])
-        
-        # 3. Gera candidatos (pedimos mais para poder filtrar os excluídos depois)
-        candidatos_brutos = MotorInferencia._gerar_base(df_completo, cols_dezenas, qtd_numeros_gerar * 3, tipo)
-        
-        # 4. Aplica Filtros (Remove Excluídos e Fixos já presentes)
-        candidatos_validos = [n for n in candidatos_brutos if n not in excluidos and n not in fixos]
-        
-        # 5. Preenche as vagas
-        escolhidos = candidatos_validos[:vagas_abertas]
-        
-        # Se faltar número (devido aos filtros agressivos), completa com aleatórios válidos
-        if len(escolhidos) < vagas_abertas:
-            todas = df_completo.head(50)[cols_dezenas].values.flatten()
-            todas = todas[~np.isnan(todas)]
-            freq = pd.Series(todas).value_counts().index.tolist()
-            extras = [n for n in freq if n not in excluidos and n not in fixos and n not in escolhidos]
-            escolhidos.extend(extras[:vagas_abertas - len(escolhidos)])
-            
-        resultado_final = list(set(escolhidos + fixos))
-        return sorted(resultado_final)
-
-    # --- MOTORES INTERNOS ---
-    @staticmethod
-    def _gerar_base(df, cols, qtd, tipo):
-        # Lógica centralizada de geração
+        # Dados para Filtros
         todas = df.head(50)[cols].values.flatten()
         todas = todas[~np.isnan(todas)]
-        freq = pd.Series(todas).value_counts()
-        numeros = freq.index.tolist()
+        freq = pd.Series(todas).value_counts().sort_values(ascending=False)
         
-        if tipo == "Hurst":
-            somas = df[cols].sum(axis=1).head(60).values
-            try:
-                # Cálculo Hurst rápido
-                ts = np.array(somas)
-                lags = range(2, 20)
-                tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
-                poly = np.polyfit(np.log(lags), np.log(tau), 1)
-                h = poly[0] * 2.0
-            except: h = 0.5
-            
-            if h > 0.55: return set([int(x) for x in numeros[:qtd]]) # Quentes
-            elif h < 0.45: return set([int(x) for x in numeros[-qtd:]]) # Frios
-            else: 
-                import random
-                return set([int(x) for x in random.sample(numeros[:qtd*2], qtd)])
+        # Backtest
+        vencedor, score, placar = MotorInferencia.executar_backtest(df, cols)
+        
+        return df, cols, vencedor, placar, freq
+    except:
+        return None, None, None, None, None
 
-        elif tipo == "Markov":
-            ultimo_sorteio = set(df.iloc[0][cols].dropna().values)
-            candidatos = []
-            for i in range(1, min(100, len(df)-1)):
-                jogo_passado = set(df.iloc[i][cols].dropna().values)
-                if len(ultimo_sorteio.intersection(jogo_passado)) >= 2:
-                    candidatos.extend(df.iloc[i-1][cols].dropna().values)
-            
-            if candidatos:
-                top = pd.Series(candidatos).value_counts().head(qtd).index.tolist()
-                return set([int(x) for x in top])
-            else:
-                return set([int(x) for x in numeros[:qtd]]) # Fallback
+def calcular_stats(p):
+    pares = len([x for x in p if x % 2 == 0])
+    soma = sum(p)
+    return f"P:{pares} Í:{len(p)-pares} | Σ:{soma}"
 
-        elif tipo == "Gauss":
-            somas = df[cols].sum(axis=1)
-            media = somas.mean()
-            import random
-            # Tenta achar combinação perto da média
-            for _ in range(50):
-                samp = random.sample(numeros[:qtd*3], qtd)
-                if abs(sum(samp) - media) < (media * 0.15):
-                    return set([int(x) for x in samp])
-            return set([int(x) for x in numeros[:qtd]])
+def calcular_score_visual(p, total_dezenas):
+    """Calcula um score simples para barra de progresso (equilíbrio)"""
+    pares = len([x for x in p if x % 2 == 0])
+    ratio = pares / len(p)
+    # O ideal é 50% pares (0.5). Quanto mais longe, menor o score.
+    diff = abs(ratio - 0.5) 
+    score = max(0, 1.0 - (diff * 2)) # 1.0 é perfeito, 0.0 é péssimo
+    return score
 
-        elif tipo == "Estocástico":
-            # Oversold: Apareceu pouco recentemente mas é frequente no geral
-            candidatos = []
-            for num in numeros:
-                recente = (df.head(10)[cols].values == num).sum()
-                if recente <= 1: candidatos.append(num)
-            
-            if len(candidatos) < qtd: candidatos.extend(numeros)
-            return set([int(x) for x in candidatos[:qtd]])
-            
-        return set([int(x) for x in numeros[:qtd]])
+def to_csv(lista_jogos):
+    """Converte lista de jogos para CSV"""
+    output = BytesIO()
+    df = pd.DataFrame(lista_jogos)
+    df.to_csv(output, index=False, sep=';')
+    return output.getvalue()
 
-class MotorFractal:
-    # Apenas helper para Hurst externo se precisar
-    pass
+# --- 4. SIDEBAR ---
+with st.sidebar:
+    st.title("🧩 FRACTALV")
+    st.caption("Pro Analyst v5.0")
+    st.divider()
+    st.info("Sistema de Análise Híbrida Ativo.")
+    
+    with st.expander("📖 Legenda das Bolas"):
+        st.markdown("""
+        <div class='loto-ball ball-normal'>01</div> Normal (Matemático)<br>
+        <div class='loto-ball ball-fixed'>10</div> Fixo (Obrigatório)<br>
+        <div class='loto-ball ball-hot'>59</div> Sugestão IA (Futuro)
+        """, unsafe_allow_html=True)
+
+# --- 5. PAINEL PRINCIPAL ---
+st.title("Painel Estratégico de Lotarias")
+
+otimizador = OtimizadorFinanceiro(LINKS_CSV.get("VALORES"))
+jogos = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
+cols_layout = st.columns(2)
+
+for i, jogo in enumerate(jogos):
+    with cols_layout[i % 2]:
+        with st.container(border=True):
+            # Header Customizado
+            st.markdown(f"""
+            <div class='card-header'>
+                <span>{jogo.replace('_', ' ')}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 1. Processamento e Backtest
+            df, cols_dezenas, vencedor, placar, freq = get_data_and_backtest(jogo)
+            
+            if df is not None:
+                # Placar do Backtest Compacto
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    st.markdown(f"Modelo Vencedor (Hoje): <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
+                with c2:
+                    st.caption(f"Score Backtest: {placar[vencedor]} acertos")
+
+                # --- SISTEMA DE ABAS ---
+                tab_orc, tab_filtros, tab_gerador = st.tabs(["💰 Budget", "⚙️ Filtros", "🎲 Mesa de Análise"])
+                
+                # ABA 1: ORÇAMENTO
+                with tab_orc:
+                    orcamento = st.number_input("Investimento (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
+                    if st.button("CALCULAR ESTRATÉGIA", key=f"btn_{jogo}", use_container_width=True):
+                        res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
+                        if "erro" not in res:
+                            st.session_state[f'res_{jogo}'] = res
+                            st.session_state[f'modelo_{jogo}'] = vencedor
+                            st.success(f"Cálculo concluído com modelo {vencedor}!")
+                        else:
+                            st.error(res['erro'])
+
+                # ABA 2: FILTROS VISUAIS
+                with tab_filtros:
+                    if freq is not None:
+                        # Heatmap Horizontal
+                        st.caption("Top 10 Dezenas Mais Frequentes (Trend)")
+                        st.bar_chart(freq.head(10), height=120, color="#00FF99")
+                        
+                        todas_possiveis = sorted(freq.index.tolist())
+                        fixos = st.multiselect("🔒 Números Fixos (Obrigatórios):", todas_possiveis, key=f"fix_{jogo}")
+                        excluidos = st.multiselect("🚫 Números Excluídos (Banidos):", todas_possiveis, key=f"exc_{jogo}")
+                        
+                        st.session_state[f'filtros_{jogo}'] = {'fixos': fixos, 'excluidos': excluidos}
+
+                # ABA 3: GERADOR VISUAL (Bolas)
+                with tab_gerador:
+                    if f'res_{jogo}' in st.session_state:
+                        res = st.session_state[f'res_{jogo}']
+                        modelo_ativo = st.session_state[f'modelo_{jogo}']
+                        filtros = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
+                        
+                        # Lista para exportação CSV
+                        dados_exportacao = []
+                        
+                        st.markdown(f"**Estratégia Ativa:** {modelo_ativo}")
+                        
+                        for item in res['carrinho']:
+                            q_vol = item['qtd_volantes']
+                            q_dez = int(item['dezenas'])
+                            
+                            st.markdown(f"👉 **{q_vol}x** Jogos de **{q_dez}** dezenas:")
+                            
+                            # Gera os palpites
+                            palpites_gerados = []
+                            for _ in range(q_vol):
+                                p = MotorInferencia.prever_proximo(
+                                    modelo_ativo, df, cols_dezenas, q_dez, 
+                                    fixos=filtros['fixos'], excluidos=filtros['excluidos']
+                                )
+                                palpites_gerados.append(p)
+                            
+                            # Renderiza cada jogo
+                            for idx, p in enumerate(palpites_gerados):
+                                html_balls = ""
+                                for n in p:
+                                    n_str = str(int(n)).zfill(2)
+                                    # Estilo da bola
+                                    css_class = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
+                                    html_
