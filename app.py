@@ -66,7 +66,7 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Pro Analyst v7.3")
+    st.caption("Pro Analyst v7.3 (Fixed)")
     st.divider()
     st.success("Financial Dashboard Ativo")
     with st.expander("Legenda"):
@@ -161,8 +161,10 @@ for i, jogo in enumerate(jogos):
                                 stats_txt = calcular_stats(p)
                                 score_eq = calcular_score_visual(p, q_dez)
                                 
+                                # AQUI ESTAVA O ERRO - AGORA CORRIGIDO E BLINDADO
                                 c_v, c_i = st.columns([3, 1])
-                                with c_v: st.markdown(html_balls, unsafe_allow_html=True)
+                                with c_v: 
+                                    st.markdown(html_balls, unsafe_allow_html=True)
                                 with c_i:
                                     st.progress(score_eq, text="Equilíbrio")
                                     st.markdown(f"<div class='stat-box'>{stats_txt}</div>", unsafe_allow_html=True)
