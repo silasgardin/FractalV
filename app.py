@@ -6,7 +6,7 @@ from motor_matematico import OtimizadorFinanceiro, MotorInferencia
 from links_planilhas import LINKS_CSV
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="FRACTALV | Deterministic", layout="wide", page_icon="🧩")
+st.set_page_config(page_title="FRACTALV | Pro Analyst", layout="wide", page_icon="🧩")
 
 # --- 2. CSS PERSONALIZADO ---
 st.markdown("""
@@ -20,6 +20,10 @@ st.markdown("""
     .winner-tag { background-color: #00FF99; color: black; padding: 4px 10px; border-radius: 15px; font-weight: bold; font-size: 12px; }
     .stat-box { font-size: 11px; color: #aaa; background: #1f2937; padding: 4px 8px; border-radius: 4px; margin-top: 5px; display: inline-block; }
     .stProgress > div > div > div > div { background-color: #a855f7; }
+    div[data-testid="stTable"] { font-size: 14px; }
+    
+    /* Box Financeiro */
+    .financial-box { border: 1px solid #333; background: #1a1a1a; padding: 15px; border-radius: 10px; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -35,10 +39,10 @@ def get_data_and_backtest(jogo_key):
         todas = df.head(50)[cols].values.flatten()
         todas = todas[~np.isnan(todas)]
         freq = pd.Series(todas).value_counts().sort_values(ascending=False)
-        vencedor, score, placar = MotorInferencia.executar_backtest(df, cols)
-        return df, cols, vencedor, placar, freq
+        vencedor, score_total, placar_dict = MotorInferencia.executar_backtest_profundo(df, cols, profundidade=12)
+        return df, cols, vencedor, score_total, placar_dict, freq
     except:
-        return None, None, None, None, None
+        return None, None, None, None, None, None
 
 def calcular_stats(p):
     pares = len([x for x in p if x % 2 == 0])
@@ -64,10 +68,12 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Deterministic Engine v6.0")
+    st.caption("Pro Analyst v7.2")
     st.divider()
-    st.success("Modo de Precisão Ativo")
-    st.info("Os resultados agora são fixos para o dia (Determinísticos). O modelo não muda de opinião até o próximo sorteio.")
+    st.success("Financial Dashboard Ativo")
+    st.info("Agora você tem controle total sobre o investimento e o troco calculado.")
+    with st.expander("Legenda"):
+        st.markdown("<div class='loto-ball ball-normal'>01</div> Sugerido<br><div class='loto-ball ball-fixed'>10</div> Fixo", unsafe_allow_html=True)
 
 # --- 5. PAINEL PRINCIPAL ---
 st.title("Painel Estratégico de Lotarias")
@@ -81,32 +87,65 @@ for i, jogo in enumerate(jogos):
         with st.container(border=True):
             st.markdown(f"<div class='card-header'><span>{jogo.replace('_', ' ')}</span></div>", unsafe_allow_html=True)
             
-            df, cols_dezenas, vencedor, placar, freq = get_data_and_backtest(jogo)
+            df, cols_dezenas, vencedor, score_total, placar_dict, freq = get_data_and_backtest(jogo)
             
             if df is not None:
                 c1, c2 = st.columns([2, 1])
-                with c1: st.markdown(f"Modelo Vencedor: <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
-                with c2: st.caption(f"Score Backtest: {placar[vencedor]} acertos")
+                with c1: st.markdown(f"Estratégia Vencedora: <span class='winner-tag'>{vencedor}</span>", unsafe_allow_html=True)
+                with c2: st.caption(f"Score: {score_total} acertos (12 jogos)")
 
-                tab_orc, tab_filtros, tab_gerador = st.tabs(["💰 Budget", "⚙️ Filtros", "🎲 Mesa de Análise"])
+                tab_backtest, tab_orc, tab_filtros, tab_gerador = st.tabs(["📊 Auditoria", "💰 Budget", "⚙️ Filtros", "🎲 Mesa de Análise"])
                 
+                with tab_backtest:
+                    st.caption("Performance acumulada nos últimos 12 concursos:")
+                    if placar_dict:
+                        df_placar = pd.DataFrame(list(placar_dict.items()), columns=['Modelo', 'Total Acertos'])
+                        df_placar['Média/Jogo'] = (df_placar['Total Acertos'] / 12).round(2)
+                        df_placar = df_placar.sort_values(by='Total Acertos', ascending=False)
+                        st.dataframe(df_placar, hide_index=True, use_container_width=True)
+
+                # --- MUDANÇA PRINCIPAL AQUI (RESUMO FINANCEIRO) ---
                 with tab_orc:
-                    orcamento = st.number_input("Investimento (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
+                    orcamento = st.number_input("Investimento Máximo (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
+                    
                     if st.button("CALCULAR ESTRATÉGIA", key=f"btn_{jogo}", use_container_width=True):
                         res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
                         if "erro" not in res:
                             st.session_state[f'res_{jogo}'] = res
                             st.session_state[f'modelo_{jogo}'] = vencedor
-                            st.success(f"Cálculo fixado com modelo {vencedor}!")
+                            
+                            # CÁLCULOS DO RESUMO FINANCEIRO
+                            total_gasto = sum([item['custo_total'] for item in res['carrinho']])
+                            total_volantes = sum([item['qtd_volantes'] for item in res['carrinho']])
+                            troco = res['sobra']
+                            
+                            st.success(f"Estratégia Otimizada com Sucesso!")
+                            
+                            # DASHBOARD FINANCEIRO
+                            st.markdown("<div class='financial-box'>", unsafe_allow_html=True)
+                            col_f1, col_f2, col_f3 = st.columns(3)
+                            col_f1.metric("Investimento Real", f"R$ {total_gasto:.2f}")
+                            col_f2.metric("Troco (Sobra)", f"R$ {troco:.2f}")
+                            col_f3.metric("Total de Jogos", f"{total_volantes}")
+                            st.markdown("</div>", unsafe_allow_html=True)
+                            
+                            st.markdown("---")
+                            st.caption("Detalhamento do Carrinho:")
+                            
+                            # Tabela de Detalhamento
+                            if res['carrinho']:
+                                df_cart = pd.DataFrame(res['carrinho'])
+                                df_cart = df_cart[['qtd_volantes', 'dezenas', 'custo_total']]
+                                df_cart.columns = ['Qtd', 'Dezenas', 'Custo (R$)']
+                                st.dataframe(df_cart, hide_index=True, use_container_width=True)
+                                
                         else: st.error(res['erro'])
 
                 with tab_filtros:
                     if freq is not None:
-                        st.caption("Top 10 Dezenas Mais Frequentes")
-                        st.bar_chart(freq.head(10), height=120, color="#a855f7")
                         todas_possiveis = sorted(freq.index.tolist())
-                        fixos = st.multiselect("🔒 Números Fixos:", todas_possiveis, key=f"fix_{jogo}")
-                        excluidos = st.multiselect("🚫 Números Excluídos:", todas_possiveis, key=f"exc_{jogo}")
+                        fixos = st.multiselect("🔒 Fixos:", todas_possiveis, key=f"fix_{jogo}")
+                        excluidos = st.multiselect("🚫 Excluídos:", todas_possiveis, key=f"exc_{jogo}")
                         st.session_state[f'filtros_{jogo}'] = {'fixos': fixos, 'excluidos': excluidos}
 
                 with tab_gerador:
@@ -116,28 +155,23 @@ for i, jogo in enumerate(jogos):
                         filtros = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
                         dados_exportacao = []
                         
-                        st.markdown(f"**Estratégia Ativa:** {modelo_ativo}")
-                        
-                        global_game_index = 0 # Contador global de jogos para seed
+                        st.markdown(f"**Estratégia:** {modelo_ativo} (Determinístico)")
+                        global_idx = 0
                         
                         for item in res['carrinho']:
                             q_vol = item['qtd_volantes']
                             q_dez = int(item['dezenas'])
                             st.markdown(f"👉 **{q_vol}x** Jogos de **{q_dez}** dezenas:")
                             
-                            palpites_gerados = []
                             for _ in range(q_vol):
-                                global_game_index += 1
-                                # PASSAMOS O GLOBAL_GAME_INDEX COMO SEED
+                                global_idx += 1
                                 p = MotorInferencia.prever_proximo(
                                     modelo_ativo, df, cols_dezenas, q_dez, 
                                     fixos=filtros['fixos'], excluidos=filtros['excluidos'],
-                                    seed_index=global_game_index
+                                    seed_index=global_idx
                                 )
-                                palpites_gerados.append(p)
-                            
-                            for idx, p in enumerate(palpites_gerados):
-                                html_balls = f"<span class='game-index'>#{idx+1:02d}</span>"
+                                
+                                html_balls = f"<span class='game-index'>#{global_idx:02d}</span>"
                                 for n in p:
                                     n_str = str(int(n)).zfill(2)
                                     css_class = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
@@ -146,19 +180,4 @@ for i, jogo in enumerate(jogos):
                                 stats_txt = calcular_stats(p)
                                 score_eq = calcular_score_visual(p, q_dez)
                                 
-                                c_v, c_i = st.columns([3, 1])
-                                with c_v: st.markdown(html_balls, unsafe_allow_html=True)
-                                with c_i:
-                                    st.progress(score_eq, text="Equilíbrio")
-                                    st.markdown(f"<div class='stat-box'>{stats_txt}</div>", unsafe_allow_html=True)
-                                
-                                dados_exportacao.append({"Jogo": idx+1, "Dezenas": p, "Modelo": modelo_ativo})
-                            st.divider()
-                        
-                        c1, c2 = st.columns(2)
-                        if dados_exportacao:
-                            txt = "\n".join([f"Jogo {d['Jogo']}: {d['Dezenas']}" for d in dados_exportacao])
-                            c1.download_button("📄 Baixar Texto", txt, f"{jogo}.txt")
-                            c2.download_button("📊 Baixar Excel", to_csv(dados_exportacao), f"{jogo}.csv", "text/csv")
-                    else: st.info("Vá à aba 'Budget' e clique em Calcular.")
-            else: st.warning("Aguardando conexão...")
+                                c_v
