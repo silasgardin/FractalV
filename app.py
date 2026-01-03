@@ -1,164 +1,134 @@
 import streamlit as st
 import pandas as pd
+import google.generativeai as genai
 import time
+import requests
 from motor_matematico import OtimizadorFinanceiro, MotorFractal
 from links_planilhas import LINKS_CSV
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(
-    page_title="FRACTALV | Gestão Estratégica",
-    page_icon="🧩",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# --- CONFIGURAÇÃO INICIAL ---
+st.set_page_config(page_title="FRACTALV", layout="wide", page_icon="🧩")
 
-# --- ESTILIZAÇÃO CSS (Visual Dark/Tech) ---
+# --- CSS PARA VISUAL TECH ---
 st.markdown("""
 <style>
-    .stMetric {
-        background-color: #1E1E1E;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #333;
-    }
-    .big-font {
-        font-size: 20px !important;
-        font-weight: bold;
-    }
-    .card-header {
-        font-size: 18px;
-        font-weight: bold;
-        color: #00FF99;
-        margin-bottom: 10px;
-        border-bottom: 1px solid #444;
-        padding-bottom: 5px;
-    }
+    .stApp { background-color: #0E1117; }
+    .status-box { padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 14px;}
+    .success { background-color: #1f77b4; color: white; }
+    .error { background-color: #d62728; color: white; }
+    .card-title { color: #00FF99; font-size: 22px; font-weight: bold; border-bottom: 1px solid #444; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES AUXILIARES ---
-@st.cache_data(ttl=3600) # Cache de 1 hora para não ficar recarregando CSV toda hora
-def carregar_dados_jogo(nome_jogo, link_csv):
-    """Lê o CSV do jogo e retorna o último resultado e estatísticas básicas"""
+# --- FUNÇÕES DE DIAGNÓSTICO ---
+def check_connection_drive():
+    """Testa se consegue acessar o CSV Mestre de Valores"""
     try:
-        # Se for usar links WEB, use pd.read_csv(link_csv)
-        # Aqui, como exemplo, vamos assumir que o pandas consegue ler o link direto
-        df = pd.read_csv(link_csv, decimal=",", thousands=".")
-        
-        # Pega o último concurso válido
-        ultimo_resultado = df.iloc[0] # Assumindo que a linha 0 é a mais recente conforme seus CSVs
-        
-        # Tratamento para pegar as dezenas (D1, D2...)
-        colunas_dezenas = [c for c in df.columns if c.startswith('D') and '2º' not in c] # Filtra D1, D2...
-        dezenas = ultimo_resultado[colunas_dezenas].values
-        
-        return {
-            "concurso": ultimo_resultado['Concurso'],
-            "data": ultimo_resultado['Data'],
-            "dezenas": dezenas,
-            "historico_completo": df
-        }
-    except Exception as e:
-        return None
+        url = LINKS_CSV.get("VALORES")
+        response = requests.head(url)
+        return response.status_code == 200
+    except:
+        return False
 
-# --- BARRA LATERAL (CONFIGURAÇÕES GERAIS) ---
+def check_ai_connection():
+    """Verifica se a chave API existe nos segredos"""
+    return "GEMINI_API_KEY" in st.secrets
+
+# --- SIDEBAR: MONITORAMENTO DE SISTEMA ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.markdown("v1.0 - *Chaos Math Engine*")
+    st.caption("Monitoramento de Recursos")
     st.divider()
+
+    # Status Base de Dados
+    drive_ok = check_connection_drive()
+    if drive_ok:
+        st.success("Base de Dados (Drive): CONECTADO 🟢")
+    else:
+        st.error("Base de Dados (Drive): FALHA 🔴")
+
+    # Status IA
+    ai_ok = check_ai_connection()
+    if ai_ok:
+        st.success("Módulo Gemini AI: ATIVO 🟢")
+        # Configura a IA silenciosamente
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        model = genai.GenerativeModel('gemini-pro')
+    else:
+        st.warning("Módulo Gemini AI: DESCONECTADO 🟠")
+        model = None
     
-    st.subheader("⚙️ Parâmetros Globais")
-    modo_analise = st.selectbox("Modo de Análise", ["Padrão (Hurst + Markov)", "Experimental (Redes Neurais)", "Conservador (Médias)"])
-    
-    st.info("Status do Sistema: ONLINE 🟢\n\nBase de Dados: Conectada\nAPI LLM: Aguardando")
+    st.divider()
+    st.markdown("**Versão:** FractalV-1.2 (Auto-Backtest)")
 
-# --- ÁREA PRINCIPAL ---
-st.title("Painel de Controle de Apostas")
-st.markdown("Analise a tendência fractal e distribua seu orçamento com precisão matemática.")
+# --- CARREGAMENTO DE DADOS ---
+@st.cache_data(ttl=600)
+def get_data(jogo_key):
+    link = LINKS_CSV.get(jogo_key)
+    try:
+        # Lê e limpa
+        df = pd.read_csv(link, decimal=",", thousands=".")
+        # Pega colunas D1, D2... para cálculo
+        cols = [c for c in df.columns if c.startswith('D') and '2º' not in c]
+        series = df.head(60)[cols].sum(axis=1).values # Soma das dezenas para Hurst
+        last_draw = df.iloc[0]
+        return last_draw, series
+    except:
+        return None, None
 
-# Inicializa o Motor Financeiro
-# (Nota: Em produção, verifique se o caminho do CSV de valores está correto)
-otimizador = OtimizadorFinanceiro("src/Oraculo_DB_Master - Vlr_jogo.csv") # Ou use o link web
+otimizador = OtimizadorFinanceiro(LINKS_CSV.get("VALORES"))
 
-# Lista de Jogos para Gerar os CARDS
-jogos_ativos = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
+# --- INTERFACE PRINCIPAL ---
+st.title("Painel de Controle Estratégico")
 
-# Cria o Grid de Cards (3 colunas)
-col1, col2, col3 = st.columns(3)
-cols = [col1, col2, col3]
+jogos = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
+cols = st.columns(3)
 
-for i, jogo_key in enumerate(jogos_ativos):
-    # Distribui os jogos nas colunas ciclicamente
-    col_atual = cols[i % 3]
-    
-    with col_atual:
-        # --- O CARD DO JOGO ---
+for i, jogo in enumerate(jogos):
+    with cols[i % 3]:
         with st.container(border=True):
-            # 1. Cabeçalho e Último Resultado
-            st.markdown(f"<div class='card-header'>{jogo_key.replace('_', ' ')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='card-title'>{jogo.replace('_', ' ')}</div>", unsafe_allow_html=True)
             
-            # Carrega dados reais
-            dados = carregar_dados_jogo(jogo_key, LINKS_CSV.get(jogo_key, ""))
+            # 1. Backtest Automático
+            last_draw, series_numerica = get_data(jogo)
             
-            if dados:
-                dezenas_formatadas = " - ".join([str(int(d)) for d in dados['dezenas'] if pd.notna(d)])
-                st.caption(f"Último: Conc {dados['concurso']} ({dados['data']})")
-                st.code(dezenas_formatadas, language="text")
+            if series_numerica is not None:
+                st.caption(f"Último: {last_draw['Data']} (Conc. {last_draw['Concurso']})")
                 
-                # 2. Análise Rápida de Hurst (Simulada aqui, mas usando o motor real)
-                # Pega a soma das dezenas dos últimos 50 jogos para calcular Hurst
-                try:
-                    # Pequena adaptação para pegar colunas de dezenas e somar
-                    hist = dados['historico_completo'].head(50).copy()
-                    cols_d = [c for c in hist.columns if c.startswith('D') and '2º' not in c]
-                    serie_somas = hist[cols_d].sum(axis=1).values
-                    
-                    hurst_val = MotorFractal.calcular_hurst(serie_somas)
-                    
-                    # Exibe o "Velocímetro" do Hurst
-                    if hurst_val > 0.6:
-                        status_hurst = "TENDÊNCIA 📈"
-                        cor_delta = "normal" # Verde
-                    elif hurst_val < 0.4:
-                        status_hurst = "REVERSÃO 📉"
-                        cor_delta = "inverse" # Vermelho
-                    else:
-                        status_hurst = "ALEATÓRIO 🎲"
-                        cor_delta = "off" # Cinza
-
-                    st.metric("Índice Hurst (Memória)", f"{hurst_val:.2f}", status_hurst, delta_color=cor_delta)
-                except:
-                    st.warning("Dados insuficientes para Hurst")
-
+                # O CÓDIGO DECIDE SOZINHO:
+                hurst, estrategia_nome, explicacao_tec = MotorFractal.diagnosticar_tendencia(series_numerica)
+                
+                # Exibe o resultado do diagnóstico
+                st.metric("Hurst (Volatilidade)", f"{hurst:.2f}")
+                st.info(f"🎯 Modo Ativo: **{estrategia_nome}**")
+                
             else:
-                st.error("Erro ao carregar dados.")
+                st.warning("Aguardando dados...")
+                hurst = 0.5
+                estrategia_nome = "Neutro"
 
             st.divider()
-
-            # 3. Área de Orçamento e Ação
-            orcamento = st.number_input(f"Orçamento (R$)", min_value=0.0, value=30.00, step=5.00, key=f"orc_{jogo_key}")
             
-            if st.button(f"⚡ GERAR ESTRATÉGIA", key=f"btn_{jogo_key}"):
-                with st.spinner("Otimizando recursos..."):
-                    time.sleep(0.5) # Efeito visual
+            # 2. Gestão de Orçamento
+            orcamento = st.number_input("Budget (R$)", 5.0, 5000.0, 30.0, step=5.0, key=f"b_{jogo}")
+            
+            if st.button("PROCESSAR ESTRATÉGIA", key=f"btn_{jogo}", disabled=not drive_ok):
+                with st.spinner("Otimizando alocação..."):
+                    # Cálculo Financeiro
+                    res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
                     
-                    # Chama o Motor Matemático
-                    estrategia = otimizador.calcular_melhor_estrategia(jogo_key, orcamento)
-                    
-                    if "erro" not in estrategia:
-                        st.success(f"Estratégia Definida!")
+                    if "erro" not in res:
+                        st.success("Alocação Otimizada!")
+                        for item in res['carrinho']:
+                            st.write(f"• **{item['qtd_volantes']}x** jogos de **{item['dezenas']}** dezenas.")
                         
-                        # Mostra o carrinho de compras inteligente
-                        for item in estrategia['carrinho']:
-                            st.markdown(f"""
-                            **{item['quantidade_volantes']}x** Jogos de **{item['qtd_dezenas']} Dezenas**
-                            <br><small>Custo: R$ {item['custo_total']:.2f} | Prob: 1/{item['probabilidade_teorica']}</small>
-                            """, unsafe_allow_html=True)
-                            
-                        st.caption(f"Troco Estimado: R$ {estrategia['sobra']:.2f}")
-                        
-                        # Aqui viria a chamada para o AI Analyst explicar o porquê
-                        with st.expander("🤖 Análise do FRACTALV"):
-                            st.write(f"Com base no Hurst de {hurst_val:.2f}, o sistema recomenda esta distribuição para maximizar a cobertura em um cenário de {status_hurst}.")
+                        # Análise da IA se disponível
+                        if model and ai_ok:
+                            try:
+                                prompt = f"O backtest do FRACTALV para {jogo} indicou Hurst {hurst:.2f} ({estrategia_nome}). Com R$ {orcamento}, o sistema sugeriu {res['carrinho']}. Valide essa tática matematicamente em 2 frases."
+                                response = model.generate_content(prompt)
+                                st.markdown(f"**🤖 Análise:** {response.text}")
+                            except:
+                                st.caption("IA indisponível temporariamente.")
                     else:
-                        st.error(estrategia['erro'])
+                        st.error(res["erro"])
