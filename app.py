@@ -77,46 +77,33 @@ def gerar_palpites_inteligentes(qtd_jogos, qtd_dezenas_por_jogo, frequencia, mod
             
     return palpites
 
-# --- 4. SIDEBAR INTELIGENTE (RESOLUÇÃO DE ERROS) ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("AI Analyst Module v2.3 (Debug)")
+    st.caption("AI Analyst Module v2.5")
     st.divider()
     
     model = None
-    nome_modelo_usado = "Nenhum"
+    
+    # === CONFIGURAÇÃO DO MODELO ===
+    MODELO_ESCOLHIDO = "gemini-2.5-flash" 
+    # ==============================
 
     if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
         st.success("API Key: Encontrada 🟢")
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         
-        # TENTATIVA DE AUTO-CONFIGURAÇÃO DO MODELO
         try:
-            # Lista de prioridade (do mais novo para o mais antigo)
-            modelos_tentativa = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-1.0-pro']
-            
-            # Tenta instanciar o primeiro que funcionar
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            nome_modelo_usado = 'gemini-1.5-flash'
-            
+            # Tenta conectar no modelo específico de 2026
+            model = genai.GenerativeModel(MODELO_ESCOLHIDO)
         except Exception as e:
-            st.error("Erro ao configurar modelo padrão.")
+            st.error(f"Erro ao conectar no {MODELO_ESCOLHIDO}")
             
-        # Botão de Diagnóstico (Para listar o que realmente está disponível)
-        with st.expander("🛠️ Diagnóstico de Modelos"):
-            try:
-                st.write("Modelos disponíveis para sua chave:")
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        st.code(m.name)
-            except Exception as e:
-                st.write(f"Erro ao listar modelos: {e}")
-                
     else:
         st.warning("API Key: Não configurada 🟠")
     
     if model:
-        st.info(f"Modelo Ativo: {nome_modelo_usado}")
+        st.info(f"Modelo Ativo: {MODELO_ESCOLHIDO}")
 
 # --- 5. PAINEL PRINCIPAL ---
 st.title("Painel de Controle Estratégico")
@@ -176,8 +163,8 @@ for i, jogo in enumerate(jogos):
                             st.divider()
 
                         if model and todos_jogos_texto:
-                            if st.button("🤖 ANALISAR COM IA", key=f"ai_{jogo}"):
-                                with st.spinner(f"Analisando com {nome_modelo_usado}..."):
+                            if st.button("🤖 ANALISAR COM GEMINI 2.5", key=f"ai_{jogo}"):
+                                with st.spinner(f"Processando com {MODELO_ESCOLHIDO}..."):
                                     try:
                                         jogos_str = "\n".join(todos_jogos_texto)
                                         prompt = f"Analise estatisticamente para {jogo} ({modo_atual}, Hurst {hurst:.2f}):\n{jogos_str}\n\nResponda: Pares/Ímpares estão bons? Nota de 0 a 10? Breve."
@@ -185,7 +172,6 @@ for i, jogo in enumerate(jogos):
                                         st.markdown(f"<div class='ai-box'>{analise}</div>", unsafe_allow_html=True)
                                     except Exception as e:
                                         st.error(f"Erro IA: {e}")
-                                        st.caption("Dica: Verifique o 'Diagnóstico de Modelos' na barra lateral.")
                             else:
                                 st.caption("Clique para validar com IA.")
 
