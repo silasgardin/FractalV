@@ -27,12 +27,12 @@ class FractalConnector:
         self.ai_ativo = False
         try:
             # Tenta pegar a chave dos segredos do Streamlit
-            if "GEMINI_API_KEY" in st.secrets:
+            if "GEMINI_KEY" in st.secrets:
                 genai.configure(api_key=st.secrets["GEMINI_KEY"])
                 self.model = genai.GenerativeModel('gemini-pro')
                 self.ai_ativo = True
             else:
-                print("⚠️ Aviso: GEMINI_API_KEY não encontrada nos Secrets.")
+                print("⚠️ Aviso: GEMINI_KEY não encontrada nos Secrets.")
         except Exception as e:
             print(f"⚠️ Erro ao inicializar IA: {e}")
 
@@ -114,7 +114,7 @@ class FractalConnector:
     # --- MÉTODOS DA IA (GEMINI) ---
     def consultar_oraculo(self, loteria, info, jogos):
         if not self.ai_ativo:
-            return "⚠️ A IA Generativa está offline. Configure a GEMINI_API_KEY no Streamlit Secrets para receber as previsões místicas."
+            return "⚠️ A IA Generativa está offline. Configure a GEMINI_KEY no Streamlit Secrets para receber as previsões místicas."
 
         # Cria o prompt para o Gemini
         prompt = f"""
