@@ -83,7 +83,7 @@ def executar_atualizacao_geral():
 # --- 4. SIDEBAR E CONTROLES ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Auto-Pilot v11.2 (Int Fix)")
+    st.caption("Auto-Pilot v11.3")
     st.divider()
     
     # BOTÃO MESTRE
@@ -136,12 +136,14 @@ for i, jogo in enumerate(JOGOS_LISTA):
     with cols_layout[i % 2]:
         with st.container(border=True):
             
-            # Header com Botão Individual
-            c_tit, c_btn = st.columns([3, 1])
+            # --- HEADER APRIMORADO COM BOTÃO VISUAL ---
+            # Ajustei a proporção para [3, 1.2] para o botão caber melhor
+            c_tit, c_btn = st.columns([3, 1.2])
             with c_tit:
                 st.markdown(f"<div class='card-title-text'>{jogo.replace('_', ' ')}</div>", unsafe_allow_html=True)
             with c_btn:
-                if st.button("↻", key=f"up_{jogo}", help="Atualizar apenas este jogo"):
+                # ÍCONE + TEXTO: Mais profissional e clicável
+                if st.button("🔄 Atualizar", key=f"up_{jogo}", help="Baixa dados novos e roda o backtest apenas para este jogo"):
                     with st.spinner(f"Atualizando {jogo}..."):
                         dados = processar_jogo_individual(jogo)
                         st.session_state[f'dados_{jogo}'] = dados
@@ -191,7 +193,7 @@ for i, jogo in enumerate(JOGOS_LISTA):
                 with tab_filtros:
                     if freq is not None:
                         todas_possiveis = sorted(freq.index.tolist())
-                        # Converte para int para visualização limpa nos filtros
+                        # Converte para int
                         todas_possiveis_int = [int(x) for x in todas_possiveis]
                         
                         salvos = st.session_state.get(f'filtros_{jogo}', {'fixos': [], 'excluidos': []})
@@ -215,7 +217,6 @@ for i, jogo in enumerate(JOGOS_LISTA):
                         def to_csv(l):
                             out = BytesIO()
                             d = pd.DataFrame(l).drop(columns=['Dezenas'])
-                            # Garante formatação Inteira no CSV
                             d['Dezenas'] = [", ".join([str(int(n)) for n in x['Dezenas']]) for x in l]
                             d.to_csv(out, index=False, sep=';')
                             return out.getvalue()
@@ -235,7 +236,6 @@ for i, jogo in enumerate(JOGOS_LISTA):
                                 html = f"<span class='game-index'>#{idx_global:02d}</span>"
                                 for n in p:
                                     cls = "ball-fixed" if n in filtros['fixos'] else "ball-normal"
-                                    # CORREÇÃO AQUI: str(int(n)) remove o .0 flutuante
                                     html += f"<div class='loto-ball {cls}'>{str(int(n)).zfill(2)}</div>"
                                 
                                 stats = f"P:{len([x for x in p if x%2==0])} Σ:{sum(p)}"
