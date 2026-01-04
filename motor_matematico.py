@@ -31,7 +31,7 @@ class OtimizadorFinanceiro:
 
     def calcular_melhor_estrategia(self, jogo, orcamento, modo="POTENCIA"):
         """
-        modo: "POTENCIA" (Jogos mais caros/desdobrados) ou "COBERTURA" (Muitos jogos simples)
+        modo: "POTENCIA" (Maximo desdobramento), "COBERTURA" (Maxima quantidade), "EQUILIBRIO" (Misto)
         """
         if self.df_precos is None:
             if not self.carregar_dados(): return {"erro": "Erro crítico: Tabela indisponível."}
@@ -41,32 +41,71 @@ class OtimizadorFinanceiro:
         if tabela.empty: return {"erro": f"Jogo '{jogo}' não encontrado."}
 
         estrategia = {"jogo": jogo, "orcamento_inicial": orcamento, "carrinho": [], "sobra": 0}
-        saldo = orcamento
-
-        if modo == "COBERTURA":
-            # Estratégia: Pegar o jogo mais barato e comprar o máximo possível
-            # Ordena do mais barato para o mais caro
-            tabela = tabela.sort_values(by='Preço Total (R$)', ascending=True)
+        
+        # --- LÓGICA DE EQUILÍBRIO (HÍBRIDA) ---
+        if modo == "EQUILIBRIO":
+            # Divide o orçamento: 60% para tentar um jogo forte, 40% para volume
+            # Se o orçamento for baixo, o 'Greedy' do Potência vai falhar naturalmente e sobrar tudo para Cobertura
+            orcamento_power = orcamento * 0.60
+            saldo_atual = orcamento
+            
+            # FASE 1: Tenta comprar ONE BIG SHOT (Potência) com a parte nobre do dinheiro
+            tabela_power = tabela.sort_values(by='Preço Total (R$)', ascending=False)
+            for _, row in tabela_power.iterrows():
+                custo = float(row['Preço Total (R$)'])
+                if custo <= 0: continue
+                
+                # Compra apenas 1 ou 2 jogos fortes, não gasta tudo
+                if orcamento_power >= custo:
+                    qtd = int(orcamento_power // custo)
+                    if qtd > 0:
+                        qtd = max(1, qtd) # Garante pelo menos 1 se couber
+                        dezenas_val = int(float(row['Qtd. Dezenas']))
+                        estrategia['carrinho'].append({"qtd_volantes": qtd, "dezenas": dezenas_val, "custo_total": qtd * custo})
+                        saldo_atual -= (qtd * custo)
+                        break # Sai do loop, já comprou o ticket de ouro
+            
+            # FASE 2: Com o troco (que é grande), faz a COBERTURA (jogos baratos)
+            tabela_cob = tabela.sort_values(by='Preço Total (R$)', ascending=True) # Do mais barato
             try:
-                # Pega a primeira linha (aposta simples)
-                row = tabela.iloc[0]
+                row = tabela_cob.iloc[0] # Pega o mais barato
                 custo = float(row['Preço Total (R$)'])
                 dezenas_val = int(float(row['Qtd. Dezenas']))
                 
-                if custo > 0 and saldo >= custo:
-                    qtd = int(saldo // custo)
-                    estrategia['carrinho'].append({
-                        "qtd_volantes": qtd, 
-                        "dezenas": dezenas_val, 
-                        "custo_total": qtd * custo
-                    })
-                    saldo -= (qtd * custo)
+                if saldo_atual >= custo:
+                    qtd = int(saldo_atual // custo)
+                    if qtd > 0:
+                        estrategia['carrinho'].append({
+                            "qtd_volantes": qtd, 
+                            "dezenas": dezenas_val, 
+                            "custo_total": qtd * custo
+                        })
+                        saldo_atual -= (qtd * custo)
             except: pass
             
+            estrategia['sobra'] = round(saldo_atual, 2)
+            return estrategia
+
+        # --- LÓGICA DE COBERTURA (QUANTIDADE) ---
+        elif modo == "COBERTURA":
+            tabela = tabela.sort_values(by='Preço Total (R$)', ascending=True)
+            saldo = orcamento
+            try:
+                row = tabela.iloc[0]
+                custo = float(row['Preço Total (R$)'])
+                dezenas_val = int(float(row['Qtd. Dezenas']))
+                if custo > 0 and saldo >= custo:
+                    qtd = int(saldo // custo)
+                    estrategia['carrinho'].append({"qtd_volantes": qtd, "dezenas": dezenas_val, "custo_total": qtd * custo})
+                    saldo -= (qtd * custo)
+            except: pass
+            estrategia['sobra'] = round(saldo, 2)
+            return estrategia
+            
+        # --- LÓGICA DE POTÊNCIA (PADRÃO) ---
         else:
-            # Estratégia POTENCIA (Padrão): Greedy Algorithm
-            # Ordena do mais caro para o mais barato
             tabela = tabela.sort_values(by='Preço Total (R$)', ascending=False)
+            saldo = orcamento
             for _, row in tabela.iterrows():
                 try:
                     custo = float(row['Preço Total (R$)'])
@@ -77,15 +116,12 @@ class OtimizadorFinanceiro:
                         estrategia['carrinho'].append({"qtd_volantes": qtd, "dezenas": dezenas_val, "custo_total": qtd * custo})
                         saldo -= (qtd * custo)
                 except: continue
-        
-        estrategia['sobra'] = round(saldo, 2)
-        return estrategia
+            estrategia['sobra'] = round(saldo, 2)
+            return estrategia
 
 class MotorInferencia:
-    # ... (MANTIDO IGUAL À VERSÃO ANTERIOR v11.5) ...
-    # Copie aqui o restante da classe MotorInferencia da versão anterior (v11.5)
-    # Para economizar espaço, mantenha a classe MotorInferencia exatamente como estava no código anterior.
-    # Vou replicar apenas o início para contexto, mas o conteúdo é idêntico.
+    # ... MANTENHA A CLASSE INFERENCIA IGUAL À VERSÃO ANTERIOR (v11.5) ...
+    # O foco aqui é só o Otimizador. O Inferencia não muda.
     @staticmethod
     def executar_backtest_profundo(df_completo, cols_dezenas, profundidade=12):
         try:
@@ -130,7 +166,7 @@ class MotorInferencia:
             corte_elite = min(len(candidatos), vagas + 10) 
             elite_pool = candidatos[:corte_elite]
             escolhidos = list(rng.choice(elite_pool, size=vagas, replace=False))
-        except: escolhidos = candidates[:vagas]
+        except: chosen = candidates[:vagas]
         if len(escolhidos) < vagas:
             todas = df.head(50)[cols].values.flatten()
             todas = todas[~np.isnan(todas)]
