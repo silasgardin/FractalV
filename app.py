@@ -86,10 +86,10 @@ def to_csv(lista_jogos):
     df_clean.to_csv(output, index=False, sep=';')
     return output.getvalue()
 
-# --- 4. SIDEBAR ---
+# --- 4. SIDEBAR (GUIA DO OPERADOR ATUALIZADO) ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Auto-Pilot v12.2 (Simpler)")
+    st.caption("Auto-Pilot v12.3 (Full Guide)")
     st.divider()
     if st.button("🔄 ATUALIZAR TUDO", type="primary", use_container_width=True):
         executar_atualizacao_geral()
@@ -97,9 +97,52 @@ with st.sidebar:
     if st.button("🗑️ Resetar Memória"):
         st.session_state.clear()
         st.rerun()
+    
     st.divider()
+    
+    # --- GUIA COMPLETO ---
     with st.expander("📘 Guia do Operador", expanded=False):
-        st.info("Opções Simplificadas: 'Potência' para prêmios maiores ou 'Equilíbrio' para proteção.")
+        st.markdown("### 🎨 Código Visual")
+        st.markdown("""
+        <div style='display: flex; align-items: center; margin-bottom: 5px;'>
+            <div class='loto-ball ball-normal'>01</div>
+            <span style='margin-left: 10px; font-size: 13px;'><b>Sugerido:</b> Definido pela I.A.</span>
+        </div>
+        <div style='display: flex; align-items: center; margin-bottom: 5px;'>
+            <div class='loto-ball ball-fixed'>10</div>
+            <span style='margin-left: 10px; font-size: 13px;'><b>Fixo:</b> Definido por você (Filtros).</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### 📊 Indicadores Estatísticos")
+        st.markdown("""
+        <span class='stat-tag'>Pares</span> Quantidade de nºs Pares.<br>
+        <span class='stat-tag'>Ímpares</span> Quantidade de nºs Ímpares.<br>
+        <span class='stat-tag'>Σ</span> Soma total das dezenas.<br>
+        <span class='stat-tag stat-highlight'>Primos</span> Números Primos (ex: 2, 3, 5, 7...).<br>
+        <span class='stat-tag stat-highlight'>Fibo</span> Sequência Fibonacci (ex: 1, 2, 3, 5, 8...).<br>
+        **Barra Equilíbrio:** Mede a razão Par/Ímpar. Cheia = 50%/50%.
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### 💰 Estratégias Financeiras")
+        st.info("""
+        **🎯 Potência (Multiplicador):**
+        O sistema tenta comprar o jogo mais caro possível (Desdobramento). Foco em acertar prêmios múltiplos.
+        
+        **⚖️ Equilíbrio (Híbrido):**
+        Usa 60% do caixa para um jogo forte e 40% para jogos simples (cobertura).
+        """)
+        
+        st.markdown("---")
+        st.markdown("### 🧠 Inteligência")
+        st.markdown("""
+        **IA (Random Forest):** Padrões não-lineares.
+        **Markov:** Padrões sequenciais.
+        **Hurst:** Tendência de mercado.
+        **Gauss:** Estatística pura.
+        """)
 
 # --- 5. AUTO-START ---
 if 'startup_check' not in st.session_state:
@@ -143,7 +186,6 @@ for i, jogo in enumerate(JOGOS_LISTA):
                         st.dataframe(df_placar, hide_index=True, use_container_width=True)
 
                 with tab_orc:
-                    # --- SELETOR SIMPLIFICADO ---
                     modo_estrategia = st.radio(
                         "Estilo de Jogo:", 
                         ["🎯 Potência (Multiplicador)", "⚖️ Equilíbrio (Híbrido)"], 
