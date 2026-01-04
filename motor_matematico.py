@@ -20,22 +20,19 @@ class OtimizadorFinanceiro:
         except: return False
 
     def obter_preco_minimo(self, jogo):
-        """Retorna o valor da aposta simples (mínima) para o jogo"""
         if self.df_precos is None:
-            if not self.carregar_dados(): return 5.0 # Valor default de segurança
-            
+            if not self.carregar_dados(): return 5.0
         try:
             jogo_key = str(jogo).upper().replace(' ', '_')
             tabela = self.df_precos[self.df_precos['Loteria_Key'].str.contains(jogo_key, na=False)]
-            
             if tabela.empty: return 5.0
-            
-            # Pega o menor valor encontrado na tabela para este jogo
             return float(tabela['Preço Total (R$)'].min())
-        except:
-            return 5.0
+        except: return 5.0
 
-    def calcular_melhor_estrategia(self, jogo, orcamento):
+    def calcular_melhor_estrategia(self, jogo, orcamento, modo="POTENCIA"):
+        """
+        modo: "POTENCIA" (Jogos mais caros/desdobrados) ou "COBERTURA" (Muitos jogos simples)
+        """
         if self.df_precos is None:
             if not self.carregar_dados(): return {"erro": "Erro crítico: Tabela indisponível."}
 
@@ -43,50 +40,70 @@ class OtimizadorFinanceiro:
         tabela = self.df_precos[self.df_precos['Loteria_Key'].str.contains(jogo_key, na=False)].copy()
         if tabela.empty: return {"erro": f"Jogo '{jogo}' não encontrado."}
 
-        tabela = tabela.sort_values(by='Preço Total (R$)', ascending=False)
         estrategia = {"jogo": jogo, "orcamento_inicial": orcamento, "carrinho": [], "sobra": 0}
         saldo = orcamento
 
-        for _, row in tabela.iterrows():
+        if modo == "COBERTURA":
+            # Estratégia: Pegar o jogo mais barato e comprar o máximo possível
+            # Ordena do mais barato para o mais caro
+            tabela = tabela.sort_values(by='Preço Total (R$)', ascending=True)
             try:
+                # Pega a primeira linha (aposta simples)
+                row = tabela.iloc[0]
                 custo = float(row['Preço Total (R$)'])
-                if custo <= 0: continue
-                if saldo >= custo:
+                dezenas_val = int(float(row['Qtd. Dezenas']))
+                
+                if custo > 0 and saldo >= custo:
                     qtd = int(saldo // custo)
-                    dezenas_val = int(float(row['Qtd. Dezenas']))
-                    estrategia['carrinho'].append({"qtd_volantes": qtd, "dezenas": dezenas_val, "custo_total": qtd * custo})
+                    estrategia['carrinho'].append({
+                        "qtd_volantes": qtd, 
+                        "dezenas": dezenas_val, 
+                        "custo_total": qtd * custo
+                    })
                     saldo -= (qtd * custo)
-            except: continue
+            except: pass
+            
+        else:
+            # Estratégia POTENCIA (Padrão): Greedy Algorithm
+            # Ordena do mais caro para o mais barato
+            tabela = tabela.sort_values(by='Preço Total (R$)', ascending=False)
+            for _, row in tabela.iterrows():
+                try:
+                    custo = float(row['Preço Total (R$)'])
+                    if custo <= 0: continue
+                    if saldo >= custo:
+                        qtd = int(saldo // custo)
+                        dezenas_val = int(float(row['Qtd. Dezenas']))
+                        estrategia['carrinho'].append({"qtd_volantes": qtd, "dezenas": dezenas_val, "custo_total": qtd * custo})
+                        saldo -= (qtd * custo)
+                except: continue
+        
         estrategia['sobra'] = round(saldo, 2)
         return estrategia
 
 class MotorInferencia:
-    """
-    Cérebro Matemático V9.0 - Big Pool Strategy
-    """
+    # ... (MANTIDO IGUAL À VERSÃO ANTERIOR v11.5) ...
+    # Copie aqui o restante da classe MotorInferencia da versão anterior (v11.5)
+    # Para economizar espaço, mantenha a classe MotorInferencia exatamente como estava no código anterior.
+    # Vou replicar apenas o início para contexto, mas o conteúdo é idêntico.
     @staticmethod
     def executar_backtest_profundo(df_completo, cols_dezenas, profundidade=12):
         try:
             if len(df_completo) < (profundidade + 50): 
                 return "Hurst (Padrão)", 0, {}
-            
             placar = {"IA (Random Forest)": 0, "Hurst (Fractal)": 0, "Markov (Cadeias)": 0, "Gauss (Normal)": 0}
-            
             for i in range(profundidade):
                 alvo = set(df_completo.iloc[i][cols_dezenas].dropna().astype(int).values)
                 qtd = len(alvo)
                 df_treino = df_completo.iloc[i+1:].copy()
-                
                 p_ia = MotorInferencia.gerar_aposta_final("IA", df_treino, cols_dezenas, qtd, seed_mix=i)
                 p_hurst = MotorInferencia.gerar_aposta_final("Hurst", df_treino, cols_dezenas, qtd, seed_mix=i)
                 p_markov = MotorInferencia.gerar_aposta_final("Markov", df_treino, cols_dezenas, qtd, seed_mix=i)
                 p_gauss = MotorInferencia.gerar_aposta_final("Gauss", df_treino, cols_dezenas, qtd, seed_mix=i)
-                
                 placar["IA (Random Forest)"] += len(alvo.intersection(p_ia))
                 placar["Hurst (Fractal)"] += len(alvo.intersection(p_hurst))
                 placar["Markov (Cadeias)"] += len(alvo.intersection(p_markov))
                 placar["Gauss (Normal)"] += len(alvo.intersection(p_gauss))
-            
             melhor = max(placar, key=placar.get)
             return melhor, placar[melhor], placar
         except Exception as e:
@@ -94,10 +111,7 @@ class MotorInferencia:
 
     @staticmethod
     def prever_proximo(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos=[], excluidos=[], seed_index=0):
-        return MotorInferencia.gerar_aposta_final(
-            modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, 
-            fixos, excluidos, seed_mix=seed_index
-        )
+        return MotorInferencia.gerar_aposta_final(modelo_vencedor, df_completo, cols_dezenas, qtd_numeros_gerar, fixos, excluidos, seed_mix=seed_index)
 
     @staticmethod
     def gerar_aposta_final(modelo_nome, df, cols, qtd_alvo, fixos=[], excluidos=[], seed_mix=0):
@@ -105,31 +119,24 @@ class MotorInferencia:
         if "IA" in modelo_nome: tipo = "IA"
         elif "Markov" in modelo_nome: tipo = "Markov"
         elif "Gauss" in modelo_nome: tipo = "Gauss"
-        
         vagas = qtd_alvo - len(fixos)
         if vagas <= 0: return sorted(list(set(fixos))[:qtd_alvo])
-        
         tamanho_pool = max(qtd_alvo * 3, 40)
         ranking = MotorInferencia._obter_ranking(tipo, df, cols, tamanho_pool)
-        
         candidatos = [n for n in ranking if n not in excluidos and n not in fixos]
-        
         try:
             seed_val = int(df.iloc[0][cols].sum()) + (seed_mix * 9999)
             rng = np.random.default_rng(seed_val)
             corte_elite = min(len(candidatos), vagas + 10) 
             elite_pool = candidatos[:corte_elite]
             escolhidos = list(rng.choice(elite_pool, size=vagas, replace=False))
-        except:
-            escolhidos = candidates[:vagas]
-            
+        except: escolhidos = candidates[:vagas]
         if len(escolhidos) < vagas:
             todas = df.head(50)[cols].values.flatten()
             todas = todas[~np.isnan(todas)]
             freq = pd.Series(todas).value_counts().index.tolist()
             extras = [n for n in freq if n not in excluidos and n not in fixos and n not in escolhidos]
             escolhidos.extend(extras[:vagas - len(escolhidos)])
-            
         final = list(set(escolhidos + fixos))
         return sorted(final)
 
@@ -139,7 +146,6 @@ class MotorInferencia:
         todas = todas[~np.isnan(todas)]
         freq = pd.Series(todas).value_counts()
         ranking_freq = freq.index.tolist()
-        
         if tipo == "IA":
             try:
                 data = df[cols].dropna().values.astype(int)
@@ -162,9 +168,7 @@ class MotorInferencia:
                 for n in ranking_freq:
                     if n not in ranking_ia: ranking_ia.append(n)
                 return ranking_ia[:qtd_pool]
-            except:
-                return ranking_freq
-
+            except: return ranking_freq
         elif tipo == "Hurst":
             somas = df[cols].sum(axis=1).head(60).values
             try:
@@ -176,7 +180,6 @@ class MotorInferencia:
             except: h = 0.5
             if h < 0.45: return ranking_freq[::-1][:qtd_pool]
             return ranking_freq[:qtd_pool]
-
         elif tipo == "Markov":
             ultimo = set(df.iloc[0][cols].dropna().values)
             candidatos = []
@@ -189,10 +192,7 @@ class MotorInferencia:
                 full = ranking_mk + [x for x in ranking_freq if x not in ranking_mk]
                 return full[:qtd_pool]
             return ranking_freq[:qtd_pool]
-
-        elif tipo == "Gauss":
-            return ranking_freq[:qtd_pool]
-            
+        elif tipo == "Gauss": return ranking_freq[:qtd_pool]
         return ranking_freq[:qtd_pool]
 
 class MotorFractal:
