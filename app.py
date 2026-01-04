@@ -29,7 +29,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Lista Global de Jogos
+# Lista Global de Jogos e Constantes
 JOGOS_LISTA = ["MEGA_SENA", "LOTOFACIL", "QUINA", "LOTOMANIA", "TIMEMANIA", "DIA_DE_SORTE", "DUPLA_SENA"]
 PRIMOS = set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97])
 FIBONACCI = set([1, 2, 3, 5, 8, 13, 21, 34, 55, 89])
@@ -89,7 +89,7 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Auto-Pilot v11.5 (UX Fix)")
+    st.caption("Auto-Pilot v12.0 (Flex Mode)")
     st.divider()
     if st.button("🔄 ATUALIZAR TUDO", type="primary", use_container_width=True):
         executar_atualizacao_geral()
@@ -99,7 +99,7 @@ with st.sidebar:
         st.rerun()
     st.divider()
     with st.expander("📘 Guia do Operador", expanded=False):
-        st.info("Valores de investimento agora iniciam com o preço mínimo do jogo.")
+        st.info("Agora você pode escolher entre 'Potência' (jogos caros) ou 'Cobertura' (muitos jogos baratos).")
 
 # --- 5. AUTO-START ---
 if 'startup_check' not in st.session_state:
@@ -143,19 +143,31 @@ for i, jogo in enumerate(JOGOS_LISTA):
                         st.dataframe(df_placar, hide_index=True, use_container_width=True)
 
                 with tab_orc:
-                    # UX: PEGA O VALOR DO JOGO DINAMICAMENTE
+                    # --- NOVO SELETOR DE MODO ---
+                    modo_estrategia = st.radio(
+                        "Estilo de Jogo:", 
+                        ["🎯 Potência (Multiplicador)", "🛡️ Cobertura (Quantidade)"], 
+                        horizontal=True,
+                        key=f"mode_{jogo}"
+                    )
+                    
                     valor_minimo_jogo = otimizador.obter_preco_minimo(jogo)
                     
                     orcamento = st.number_input(
                         "Investimento (R$)", 
                         min_value=valor_minimo_jogo, 
-                        value=valor_minimo_jogo, # AQUI: Valor padrão = Preço do jogo
-                        step=valor_minimo_jogo,  # Step inteligente (pula de jogo em jogo)
+                        value=valor_minimo_jogo,
+                        step=valor_minimo_jogo,
                         key=f"b_{jogo}"
                     )
                     
                     if st.button("CALCULAR", key=f"btn_{jogo}", use_container_width=True):
-                        res = otimizador.calcular_melhor_estrategia(jogo, orcamento)
+                        # Mapeia a seleção para a chave interna
+                        modo_key = "COBERTURA" if "Cobertura" in modo_estrategia else "POTENCIA"
+                        
+                        # Passa o modo para o otimizador
+                        res = otimizador.calcular_melhor_estrategia(jogo, orcamento, modo=modo_key)
+                        
                         if "erro" not in res:
                             st.session_state[f'res_{jogo}'] = res
                             custo = sum(x['custo_total'] for x in res['carrinho'])
