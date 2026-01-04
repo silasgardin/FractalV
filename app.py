@@ -89,7 +89,7 @@ def to_csv(lista_jogos):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🧩 FRACTALV")
-    st.caption("Auto-Pilot v12.1 (Hybrid)")
+    st.caption("Auto-Pilot v12.2 (Simpler)")
     st.divider()
     if st.button("🔄 ATUALIZAR TUDO", type="primary", use_container_width=True):
         executar_atualizacao_geral()
@@ -99,7 +99,7 @@ with st.sidebar:
         st.rerun()
     st.divider()
     with st.expander("📘 Guia do Operador", expanded=False):
-        st.info("Novo Modo: 'Equilíbrio'. Usa 60% do caixa para um jogo forte e 40% para jogos de cobertura.")
+        st.info("Opções Simplificadas: 'Potência' para prêmios maiores ou 'Equilíbrio' para proteção.")
 
 # --- 5. AUTO-START ---
 if 'startup_check' not in st.session_state:
@@ -143,10 +143,10 @@ for i, jogo in enumerate(JOGOS_LISTA):
                         st.dataframe(df_placar, hide_index=True, use_container_width=True)
 
                 with tab_orc:
-                    # --- SELETOR TRIPLO ---
+                    # --- SELETOR SIMPLIFICADO ---
                     modo_estrategia = st.radio(
                         "Estilo de Jogo:", 
-                        ["🎯 Potência (Multiplicador)", "🛡️ Cobertura (Quantidade)", "⚖️ Equilíbrio (Híbrido)"], 
+                        ["🎯 Potência (Multiplicador)", "⚖️ Equilíbrio (Híbrido)"], 
                         horizontal=True,
                         key=f"mode_{jogo}"
                     )
@@ -162,9 +162,7 @@ for i, jogo in enumerate(JOGOS_LISTA):
                     )
                     
                     if st.button("CALCULAR", key=f"btn_{jogo}", use_container_width=True):
-                        # Mapeamento do Modo
-                        if "Cobertura" in modo_estrategia: modo_key = "COBERTURA"
-                        elif "Equilíbrio" in modo_estrategia: modo_key = "EQUILIBRIO"
+                        if "Equilíbrio" in modo_estrategia: modo_key = "EQUILIBRIO"
                         else: modo_key = "POTENCIA"
                         
                         res = otimizador.calcular_melhor_estrategia(jogo, orcamento, modo=modo_key)
